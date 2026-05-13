@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "划词解释",
+  "version": "1.0.0",
+  "description": "选中文字自动解释，Ctrl+Space 开启多词模式",
+  "permissions": ["storage"],
+  "host_permissions": ["https://api.deepseek.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "划词解释"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

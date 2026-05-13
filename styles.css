@@ -1,0 +1,93 @@
+.text-explainer-bubble {
+  position: absolute;
+  z-index: 2147483647;
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #333;
+  animation: te-fadeIn 0.2s ease;
+}
+
+@keyframes te-fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.te-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  font-weight: 600;
+  font-size: 13px;
+  color: #666;
+}
+
+.te-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #999;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.te-close:hover { color: #333; }
+
+.te-body { padding: 12px 14px; }
+.te-body p { margin: 0 0 8px 0; }
+.te-body p:last-child { margin-bottom: 0; }
+
+.te-loading {
+  padding: 20px 14px;
+  text-align: center;
+  color: #999;
+}
+
+.te-error { color: #e74c3c; }
+
+/* 小绿点：跟随光标，表示多词模式已开启 */
+#te-green-dot {
+  position: fixed;
+  z-index: 2147483646;
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+  pointer-events: none;
+  animation: te-fadeIn 0.15s ease;
+}
+
+/* 多词高亮 */
+.te-highlight {
+  background: #fef08a;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* 多词计数徽章 */
+#te-count-badge {
+  position: fixed;
+  z-index: 2147483647;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  animation: te-fadeIn 0.15s ease;
+  pointer-events: none;
+}
