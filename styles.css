@@ -1,13 +1,15 @@
+/* ======== 气泡主体 ======== */
 .text-explainer-bubble {
   position: absolute;
   z-index: 2147483647;
-  width: 320px;
-  max-height: 400px;
-  overflow-y: auto;
+  width: 380px;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border: 1px solid #e0e0e0;
-  border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: 14px;
   line-height: 1.7;
@@ -20,6 +22,7 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ======== 标题栏 ======== */
 .te-header {
   display: flex;
   justify-content: space-between;
@@ -29,12 +32,13 @@
   font-weight: 600;
   font-size: 13px;
   color: #666;
+  flex-shrink: 0;
 }
 
 .te-close {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: 20px;
   color: #999;
   cursor: pointer;
   padding: 0 4px;
@@ -42,19 +46,169 @@
 }
 .te-close:hover { color: #333; }
 
-.te-body { padding: 12px 14px; }
-.te-body p { margin: 0 0 8px 0; }
-.te-body p:last-child { margin-bottom: 0; }
-
-.te-loading {
-  padding: 20px 14px;
-  text-align: center;
-  color: #999;
+/* ======== 内容区（可滚动消息列表） ======== */
+.te-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  min-height: 60px;
 }
 
-.te-error { color: #e74c3c; }
+.te-loading {
+  text-align: center;
+  color: #999;
+  padding: 16px 0;
+}
 
-/* 小绿点：跟随光标，表示多词模式已开启 */
+/* ======== 消息气泡 ======== */
+.te-msg {
+  margin-bottom: 8px;
+}
+
+.te-msg-user {
+  background: #f0f0ff;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.te-msg-ai {
+  padding: 4px 0;
+}
+
+.te-msg-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.te-msg-user .te-msg-label { color: #667eea; }
+.te-msg-ai .te-msg-label { color: #16a34a; }
+
+.te-msg-user p { margin: 0; font-size: 13px; color: #333; }
+
+.te-msg-content p { margin: 0 0 6px; }
+.te-msg-content p:last-child { margin-bottom: 0; }
+
+/* 追问分隔线 */
+.te-msg-divider {
+  border-top: 1px dashed #e8e8e8;
+  margin: 10px 0;
+}
+
+/* 思考中 */
+.te-msg-loading {
+  font-size: 12px;
+  color: #aaa;
+  padding: 6px 0;
+  animation: te-pulse 1s ease infinite;
+}
+
+@keyframes te-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* 错误消息 */
+.te-error-msg {
+  color: #e74c3c;
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+/* ======== Markdown 渲染 ======== */
+.te-md-h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 10px 0 4px;
+}
+
+.te-md-code {
+  background: #f5f5f5;
+  border: 1px solid #e8e8e8;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 13px;
+  font-family: "SF Mono", Consolas, monospace;
+}
+
+.te-md-ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.te-md-li {
+  margin-bottom: 2px;
+}
+
+/* ======== 追问输入栏 ======== */
+.te-input-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 14px 10px;
+  border-top: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+.te-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: #fafafa;
+}
+.te-input:focus {
+  border-color: #4f46e5;
+  background: #fff;
+}
+
+.te-send-btn {
+  padding: 7px 14px;
+  background: #4f46e5;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.te-send-btn:hover { background: #4338ca; }
+
+/* ======== 收藏按钮 ======== */
+.te-bubble-actions {
+  padding: 0 14px 10px;
+  flex-shrink: 0;
+}
+
+.te-save-btn {
+  width: 100%;
+  padding: 6px 0;
+  background: none;
+  border: 1px dashed #ccc;
+  border-radius: 6px;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.te-save-btn:hover {
+  border-color: #f59e0b;
+  color: #d97706;
+  background: #fffbeb;
+}
+.te-save-btn:disabled {
+  border-color: #16a34a;
+  color: #16a34a;
+  cursor: default;
+}
+
+/* ======== 小绿点 ======== */
 #te-green-dot {
   position: fixed;
   z-index: 2147483646;
@@ -67,14 +221,14 @@
   animation: te-fadeIn 0.15s ease;
 }
 
-/* 多词高亮 */
+/* ======== 多词高亮 ======== */
 .te-highlight {
   background: #fef08a;
   border-radius: 2px;
   padding: 0 1px;
 }
 
-/* 多词计数徽章 */
+/* ======== 多词计数徽章 ======== */
 #te-count-badge {
   position: fixed;
   z-index: 2147483647;

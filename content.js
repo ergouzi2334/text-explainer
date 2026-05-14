@@ -1,5 +1,8 @@
 (function () {
   let bubble = null;
+  let bubbleBody = null;
+  let bubbleInput = null;
+  let conversation = [];       // [{role:'user'|'assistant', content}]
   let multiMode = false;
   let pendingWords = [];
   let highlights = [];
@@ -8,6 +11,75 @@
   let lastSelection = '';
   let lastRange = null;
   let lastCtrlTime = 0;
+  let currentMode = 'word';    // 'word' | 'passage'
+
+  // ======== Markdown 渲染 ========
+  function renderMarkdown(text) {
+    let html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    // 标题
+    html = html.replace(/^### (.+)$/gm, '<h3 class="te-md-h3">$1</h3>');
+    // 加粗
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // 行内代码
+    html = html.replace(/`([^`]+)`/g, '<code class="te-md-code">$1</code>');
+    // 列表项
+    html = html.replace(/^- (.+)$/gm, '<li class="te-md-li">$1</li>');
+    // 包裹连续 <li>
+    html = html.replace(/(<li class="te-md-li">.*<\/li>\n?)+/g, '<ul class="te-md-ul">$&</ul>');
+    // 段落（至少两个连续换行）
+    html = html.replace(/\n\n+/g, '</p><p>');
+    // 单个换行转 <br>
+    html = html.replace(/\n/g, '<br>');
+    // 包裹
+    html = '<p>' + html + '</p>';
+    // 修复空的 <p></p>
+    html = html.replace(/<p><\/p>/g, '');
+    return html;
+  }
+
+  // ======== 知识库存储 ========
+  const DB_NAME = 'te-knowledge';
+  const DB_VERSION = 1;
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('entries')) {
+          const store = db.createObjectStore('entries', { keyPath: 'id', autoIncrement: true });
+          store.createIndex('createdAt', 'createdAt', { unique: false });
+          store.createIndex('text', 'text', { unique: false });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function saveToKnowledge(text, explanation) {
+    try {
+      const db = await openDB();
+      const tx = db.transaction('entries', 'readwrite');
+      const store = tx.objectStore('entries');
+      store.add({
+        text,
+        explanation,
+        conversation: [...conversation],
+        createdAt: Date.now(),
+      });
+      return new Promise((resolve) => {
+        tx.oncomplete = () => { db.close(); resolve(true); };
+        tx.onerror = () => { db.close(); resolve(false); };
+      });
+    } catch (e) {
+      console.error('知识库保存失败:', e);
+      return false;
+    }
+  }
 
   // ======== 小绿点 ========
   function createGreenDot() {
@@ -46,58 +118,151 @@
     if (countBadge) { countBadge.remove(); countBadge = null; }
   }
 
-  // ======== 气泡 DOM ========
+  // ======== 气泡 ========
+  function removeBubble() {
+    if (bubble) { bubble.remove(); bubble = null; }
+    bubbleBody = null;
+    bubbleInput = null;
+    conversation = [];
+  }
+
   function createBubble(x, y) {
     removeBubble();
+    conversation = [];
+
     const div = document.createElement('div');
     div.className = 'text-explainer-bubble';
-    div.innerHTML = '<div class="te-loading">解释中...</div>';
+
+    div.innerHTML = `
+      <div class="te-header">
+        <span>解释中...</span>
+        <button class="te-close">&times;</button>
+      </div>
+      <div class="te-body">
+        <div class="te-loading">正在请教 AI...</div>
+      </div>
+      <div class="te-input-bar" style="display:none">
+        <input type="text" class="te-input" placeholder="输入追问...">
+        <button class="te-send-btn">发送</button>
+      </div>
+      <div class="te-bubble-actions" style="display:none">
+        <button class="te-save-btn">⭐ 收藏到知识库</button>
+      </div>`;
+
     document.body.appendChild(div);
-    const bw = 320;
+
+    const bw = 380;
     let left = Math.min(x, window.innerWidth - bw - 10);
     left = Math.max(left, 10);
     div.style.left = left + 'px';
-    div.style.top = (y + 10) + 'px';
+    div.style.top = Math.min(y + 10, window.innerHeight - 300) + 'px';
+
+    bubble = div;
+    bubbleBody = div.querySelector('.te-body');
+
+    // 关闭按钮
+    div.querySelector('.te-close').addEventListener('click', removeBubble);
+
+    // 追问输入
+    bubbleInput = div.querySelector('.te-input');
+    bubbleInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const q = bubbleInput.value.trim();
+        if (!q) return;
+        bubbleInput.value = '';
+        addUserMessage(q);
+        doFollowup(q);
+      }
+    });
+
+    // 发送按钮
+    div.querySelector('.te-send-btn').addEventListener('click', () => {
+      const q = bubbleInput.value.trim();
+      if (!q) return;
+      bubbleInput.value = '';
+      addUserMessage(q);
+      doFollowup(q);
+    });
+
+    // 收藏按钮
+    div.querySelector('.te-save-btn').addEventListener('click', async () => {
+      const originalText = conversation[0]?.content || '';
+      const explanation = conversation[1]?.content || '';
+      const ok = await saveToKnowledge(originalText, explanation);
+      const btn = div.querySelector('.te-save-btn');
+      if (ok) {
+        btn.textContent = '✅ 已收藏';
+        btn.disabled = true;
+      } else {
+        btn.textContent = '❌ 收藏失败';
+        setTimeout(() => { btn.textContent = '⭐ 收藏到知识库'; }, 1500);
+      }
+    });
+
     return div;
   }
 
-  function showResult(content, isBatch) {
+  function showResult(content) {
     if (!bubble) return;
-    if (isBatch) {
-      const lines = content.split('\n').filter(l => l.trim());
-      bubble.innerHTML = `
-        <div class="te-header">
-          <span>解释结果</span>
-          <button class="te-close">&times;</button>
-        </div>
-        <div class="te-body">${lines.map(l => `<p>${l}</p>`).join('')}</div>`;
+    conversation.push({ role: 'assistant', content });
+
+    bubble.querySelector('.te-header span').textContent = currentMode === 'word' ? '解释' : '深度解读';
+    bubbleBody.innerHTML = '';
+    addBubbleMessage('assistant', content);
+
+    // 显示追问栏和收藏按钮
+    bubble.querySelector('.te-input-bar').style.display = 'flex';
+    bubble.querySelector('.te-bubble-actions').style.display = 'flex';
+    bubbleInput.focus();
+  }
+
+  function addBubbleMessage(role, content) {
+    if (!bubbleBody) return;
+    const msg = document.createElement('div');
+    msg.className = role === 'user' ? 'te-msg te-msg-user' : 'te-msg te-msg-ai';
+
+    if (role === 'user') {
+      msg.innerHTML = `<span class="te-msg-label">追问</span><p>${content}</p>`;
     } else {
-      bubble.innerHTML = `
-        <div class="te-header">
-          <span>解释</span>
-          <button class="te-close">&times;</button>
-        </div>
-        <div class="te-body"><p>${content}</p></div>`;
+      msg.innerHTML = `<span class="te-msg-label">AI</span><div class="te-msg-content">${renderMarkdown(content)}</div>`;
     }
-    bubble.querySelector('.te-close').addEventListener('click', removeBubble);
+
+    // 分隔线
+    if (conversation.filter(c => c.role === 'user').length > 1) {
+      const divider = document.createElement('div');
+      divider.className = 'te-msg-divider';
+      bubbleBody.appendChild(divider);
+    }
+
+    bubbleBody.appendChild(msg);
+    bubbleBody.scrollTop = bubbleBody.scrollHeight;
+  }
+
+  function addUserMessage(text) {
+    conversation.push({ role: 'user', content: text });
+    addBubbleMessage('user', text);
+
+    // 显示加载状态
+    const loading = document.createElement('div');
+    loading.className = 'te-msg-loading';
+    loading.textContent = 'AI 思考中...';
+    bubbleBody.appendChild(loading);
+    bubbleBody.scrollTop = bubbleBody.scrollHeight;
+  }
+
+  function removeLastLoading() {
+    const loadings = bubbleBody.querySelectorAll('.te-msg-loading');
+    loadings.forEach(el => el.remove());
   }
 
   function showError(msg) {
     if (!bubble) return;
-    bubble.innerHTML = `
-      <div class="te-header">
-        <span>出错了</span>
-        <button class="te-close">&times;</button>
-      </div>
-      <div class="te-body te-error"><p>${msg}</p></div>`;
-    bubble.querySelector('.te-close').addEventListener('click', removeBubble);
+    bubble.querySelector('.te-header span').textContent = '出错了';
+    bubbleBody.innerHTML = `<div class="te-error-msg"><p>${msg}</p></div>`;
   }
 
-  function removeBubble() {
-    if (bubble) { bubble.remove(); bubble = null; }
-  }
-
-  // ======== 高亮选中文字 ========
+  // ======== 高亮选中 ========
   function highlightSelection(range) {
     try {
       const span = document.createElement('span');
@@ -136,61 +301,104 @@
   }
 
   // ======== 触发解释 ========
-  function explainSingle(text) {
+  function triggerExplain(text) {
     const sel = window.getSelection();
-    const rect = sel.getRangeAt(0).getBoundingClientRect();
-    const x = rect.left + rect.width / 2;
-    const y = rect.bottom + window.scrollY;
+    let x = window.innerWidth / 2;
+    let y = window.scrollY + 100;
+
+    if (sel && sel.rangeCount > 0) {
+      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      x = rect.left + rect.width / 2;
+      y = rect.bottom + window.scrollY;
+    }
+
+    currentMode = text.length <= 10 ? 'word' : 'passage';
     bubble = createBubble(x, y);
-    chrome.runtime.sendMessage({ type: 'explain', text, mode: 'single' }, (res) => {
-      if (chrome.runtime.lastError) { showError('通信失败'); return; }
-      if (res.success) { showResult(res.content, false); }
+
+    conversation.push({ role: 'user', content: text });
+
+    chrome.runtime.sendMessage({ type: 'explain', text, mode: currentMode }, (res) => {
+      if (chrome.runtime.lastError) { showError('通信失败，请刷新页面后重试'); return; }
+      if (res.success) { showResult(res.content); }
       else { showError(res.error); }
+    });
+  }
+
+  // ======== 追问 ========
+  function doFollowup(question) {
+    const history = [
+      { role: 'system', content: '继续对话' },
+      ...conversation.map(c => ({ role: c.role, content: c.content })),
+    ];
+
+    chrome.runtime.sendMessage({ type: 'followup', history }, (res) => {
+      removeLastLoading();
+      if (chrome.runtime.lastError) { showError('通信失败'); return; }
+      if (res.success) {
+        conversation.push({ role: 'assistant', content: res.content });
+        addBubbleMessage('assistant', res.content);
+      } else {
+        const errMsg = document.createElement('div');
+        errMsg.className = 'te-error-msg';
+        errMsg.innerHTML = `<p>追问失败：${res.error}</p>`;
+        bubbleBody.appendChild(errMsg);
+      }
     });
   }
 
   function explainBatch() {
     if (pendingWords.length === 0) return;
+    const words = [...pendingWords];
+    const text = words.join('、');
+    pendingWords = [];
+    removeBadge();
+
+    currentMode = 'word';
     const x = window.innerWidth / 2;
     const y = window.scrollY + 20;
     bubble = createBubble(x, y);
-    const words = [...pendingWords];
-    pendingWords = [];
-    removeBadge();
-    chrome.runtime.sendMessage({ type: 'explain', text: words, mode: 'batch' }, (res) => {
+    conversation.push({ role: 'user', content: text });
+
+    chrome.runtime.sendMessage({ type: 'explain', text, mode: 'batch' }, (res) => {
       if (chrome.runtime.lastError) { showError('通信失败'); return; }
-      if (res.success) { showResult(res.content, true); }
-      else { showError(res.error); }
+      if (res.success) {
+        conversation.push({ role: 'assistant', content: res.content });
+        bubble.querySelector('.te-header span').textContent = '多词解释';
+        bubbleBody.innerHTML = '';
+        const lines = res.content.split('\n').filter(l => l.trim());
+        bubbleBody.innerHTML = lines.map(l => `<p>${l}</p>`).join('');
+        bubble.querySelector('.te-input-bar').style.display = 'flex';
+        bubble.querySelector('.te-bubble-actions').style.display = 'flex';
+      } else {
+        showError(res.error);
+      }
     });
   }
 
-  // ======== 鼠标移动：小绿点跟随 ========
+  // ======== 鼠标事件 ========
   document.addEventListener('mousemove', (e) => {
     if (multiMode) moveGreenDot(e.clientX, e.clientY);
   });
 
-  // ======== 文本选中 ========
   document.addEventListener('mouseup', (e) => {
     const sel = window.getSelection();
     const text = (sel?.toString() || '').trim();
-    if (!text || text.length > 500) return;
+    if (!text || text.length > 2000) return;
     if (bubble && bubble.contains(e.target)) return;
 
     if (multiMode) {
-      // 多词模式：暂存选中文字和选区，等用户按空格确认
       lastSelection = text;
       try { lastRange = sel.getRangeAt(0).cloneRange(); } catch (e) { lastRange = null; }
       e.preventDefault();
       e.stopPropagation();
     } else {
-      // 默认模式：直接解释
-      explainSingle(text);
+      triggerExplain(text);
     }
   });
 
-  // ======== 键盘操作 ========
+  // ======== 键盘事件 ========
   document.addEventListener('keydown', (e) => {
-    // 双击 Ctrl：切换多词模式（只响应单独按下的 Ctrl，忽略组合键）
+    // 双击 Ctrl：切换多词模式
     if (e.key === 'Control' && !e.repeat) {
       const now = Date.now();
       if (now - lastCtrlTime < 500) {
@@ -211,14 +419,9 @@
       return;
     }
 
-    // 按下 Ctrl 组合键（如 Ctrl+C）时重置计时，防止误触发
-    if (e.ctrlKey) {
-      lastCtrlTime = 0;
-    }
-
+    if (e.ctrlKey) { lastCtrlTime = 0; }
     if (!multiMode) return;
 
-    // Space：确认当前选中为一个词
     if (e.code === 'Space') {
       e.preventDefault();
       e.stopPropagation();
@@ -232,7 +435,6 @@
       return;
     }
 
-    // Enter：触发批量解释
     if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
@@ -240,7 +442,6 @@
       return;
     }
 
-    // Esc：退出多词模式
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -249,7 +450,7 @@
     }
   }, true);
 
-  // ======== 全局关闭气泡 ========
+  // ======== 点击气泡外关闭 ========
   document.addEventListener('mousedown', (e) => {
     if (bubble && !bubble.contains(e.target)) {
       removeBubble();

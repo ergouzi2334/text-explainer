@@ -3,7 +3,7 @@
   "name": "划词解释",
   "version": "1.0.0",
   "description": "选中文字自动解释，Ctrl+Space 开启多词模式",
-  "permissions": ["storage"],
+  "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": ["https://api.deepseek.com/*"],
   "background": {
     "service_worker": "background.js"
