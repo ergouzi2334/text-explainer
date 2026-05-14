@@ -231,10 +231,7 @@
       if (!dragging) return;
       dragging = false;
       ball.style.transition = '';
-      var moved = Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy);
-      if (moved < 4) {
-        expandFromBall();
-      }
+      expandFromBall();
     }
 
     document.addEventListener('mousemove', onBallMove);
