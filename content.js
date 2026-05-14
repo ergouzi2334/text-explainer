@@ -13,29 +13,48 @@
   let lastCtrlTime = 0;
   let currentMode = 'word';    // 'word' | 'passage'
 
+  // ======== 拖拽状态 ========
+  let isDragging = false;
+  let dragStartX = 0, dragStartY = 0;
+  let bubbleStartX = 0, bubbleStartY = 0;
+
+  function onDragMove(e) {
+    if (!isDragging || !bubble) return;
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    clampBubble(bubbleStartX + dx, bubbleStartY + dy);
+  }
+
+  function onDragEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    if (bubble) bubble.style.transition = '';
+  }
+
+  function clampBubble(left, top) {
+    if (!bubble) return;
+    const bw = bubble.offsetWidth;
+    const bh = bubble.offsetHeight;
+    left = Math.max(8, Math.min(left, window.innerWidth - bw - 8));
+    top = Math.max(8, Math.min(top, window.innerHeight - bh - 8));
+    bubble.style.left = left + 'px';
+    bubble.style.top = top + 'px';
+  }
+
   // ======== Markdown 渲染 ========
   function renderMarkdown(text) {
     let html = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    // 标题
     html = html.replace(/^### (.+)$/gm, '<h3 class="te-md-h3">$1</h3>');
-    // 加粗
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    // 行内代码
     html = html.replace(/`([^`]+)`/g, '<code class="te-md-code">$1</code>');
-    // 列表项
     html = html.replace(/^- (.+)$/gm, '<li class="te-md-li">$1</li>');
-    // 包裹连续 <li>
     html = html.replace(/(<li class="te-md-li">.*<\/li>\n?)+/g, '<ul class="te-md-ul">$&</ul>');
-    // 段落（至少两个连续换行）
     html = html.replace(/\n\n+/g, '</p><p>');
-    // 单个换行转 <br>
     html = html.replace(/\n/g, '<br>');
-    // 包裹
     html = '<p>' + html + '</p>';
-    // 修复空的 <p></p>
     html = html.replace(/<p><\/p>/g, '');
     return html;
   }
@@ -120,6 +139,9 @@
 
   // ======== 气泡 ========
   function removeBubble() {
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+    isDragging = false;
     if (bubble) { bubble.remove(); bubble = null; }
     bubbleBody = null;
     bubbleInput = null;
@@ -143,27 +165,44 @@
       </div>
       <div class="te-input-bar" style="display:none">
         <input type="text" class="te-input" placeholder="输入追问...">
-        <button class="te-send-btn">发送</button>
+        <button class="te-send-btn">↑</button>
       </div>
       <div class="te-bubble-actions" style="display:none">
-        <button class="te-save-btn">⭐ 收藏到知识库</button>
+        <button class="te-save-btn">☆ 收藏到知识库</button>
       </div>`;
 
     document.body.appendChild(div);
 
-    const bw = 380;
-    let left = Math.min(x, window.innerWidth - bw - 10);
-    left = Math.max(left, 10);
-    div.style.left = left + 'px';
-    div.style.top = Math.min(y + 10, window.innerHeight - 300) + 'px';
-
     bubble = div;
     bubbleBody = div.querySelector('.te-body');
 
-    // 关闭按钮
+    // 初始定位（fixed 定位，viewport 坐标）
+    const bw = 360;
+    let left = Math.min(x, window.innerWidth - bw - 10);
+    left = Math.max(left, 10);
+    div.style.left = left + 'px';
+    div.style.top = Math.max(10, Math.min(y, window.innerHeight - 320)) + 'px';
+
+    // ======== 拖拽 ========
+    const header = div.querySelector('.te-header');
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('te-close')) return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      bubbleStartX = div.offsetLeft;
+      bubbleStartY = div.offsetTop;
+      div.style.transition = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', onDragEnd);
+
+    // ======== 关闭按钮 ========
     div.querySelector('.te-close').addEventListener('click', removeBubble);
 
-    // 追问输入
+    // ======== 追问输入 ========
     bubbleInput = div.querySelector('.te-input');
     bubbleInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -176,7 +215,6 @@
       }
     });
 
-    // 发送按钮
     div.querySelector('.te-send-btn').addEventListener('click', () => {
       const q = bubbleInput.value.trim();
       if (!q) return;
@@ -185,18 +223,18 @@
       doFollowup(q);
     });
 
-    // 收藏按钮
+    // ======== 收藏按钮 ========
     div.querySelector('.te-save-btn').addEventListener('click', async () => {
       const originalText = conversation[0]?.content || '';
       const explanation = conversation[1]?.content || '';
       const ok = await saveToKnowledge(originalText, explanation);
       const btn = div.querySelector('.te-save-btn');
       if (ok) {
-        btn.textContent = '✅ 已收藏';
+        btn.textContent = '★ 已收藏';
         btn.disabled = true;
       } else {
-        btn.textContent = '❌ 收藏失败';
-        setTimeout(() => { btn.textContent = '⭐ 收藏到知识库'; }, 1500);
+        btn.textContent = '✕ 收藏失败';
+        setTimeout(() => { btn.textContent = '☆ 收藏到知识库'; }, 1500);
       }
     });
 
@@ -211,7 +249,6 @@
     bubbleBody.innerHTML = '';
     addBubbleMessage('assistant', content);
 
-    // 显示追问栏和收藏按钮
     bubble.querySelector('.te-input-bar').style.display = 'flex';
     bubble.querySelector('.te-bubble-actions').style.display = 'flex';
     bubbleInput.focus();
@@ -228,7 +265,6 @@
       msg.innerHTML = `<span class="te-msg-label">AI</span><div class="te-msg-content">${renderMarkdown(content)}</div>`;
     }
 
-    // 分隔线
     if (conversation.filter(c => c.role === 'user').length > 1) {
       const divider = document.createElement('div');
       divider.className = 'te-msg-divider';
@@ -243,7 +279,6 @@
     conversation.push({ role: 'user', content: text });
     addBubbleMessage('user', text);
 
-    // 显示加载状态
     const loading = document.createElement('div');
     loading.className = 'te-msg-loading';
     loading.textContent = 'AI 思考中...';
@@ -269,18 +304,14 @@
       span.className = 'te-highlight';
       range.surroundContents(span);
       highlights.push(span);
-    } catch (e) {
-      // 跨元素选中时 surroundContents 会失败，忽略
-    }
+    } catch (e) { /* 跨元素选中会失败 */ }
   }
 
   function removeAllHighlights() {
     highlights.forEach(el => {
       const parent = el.parentNode;
       if (parent) {
-        while (el.firstChild) {
-          parent.insertBefore(el.firstChild, el);
-        }
+        while (el.firstChild) parent.insertBefore(el.firstChild, el);
         parent.removeChild(el);
         parent.normalize();
       }
@@ -300,20 +331,39 @@
     removeBubble();
   }
 
-  // ======== 触发解释 ========
-  function triggerExplain(text) {
+  // ======== 计算气泡位置（选中文字旁边） ========
+  function calcBubblePos() {
     const sel = window.getSelection();
-    let x = window.innerWidth / 2;
-    let y = window.scrollY + 100;
+    const BW = 370;
+    const GAP = 12;
 
     if (sel && sel.rangeCount > 0) {
       const rect = sel.getRangeAt(0).getBoundingClientRect();
-      x = rect.left + rect.width / 2;
-      y = rect.bottom + window.scrollY;
+      if (rect.width > 0) {
+        // 优先放在选中区域右侧
+        if (rect.right + BW + GAP < window.innerWidth) {
+          return { x: rect.right + GAP, y: rect.top - 10 };
+        }
+        // 右侧不够，放左侧
+        if (rect.left - BW - GAP > 0) {
+          return { x: rect.left - BW - GAP, y: rect.top - 10 };
+        }
+        // 两侧都不够，放下方
+        return { x: Math.max(GAP, rect.left), y: rect.bottom + GAP };
+      }
+      // 选区宽度为 0（光标），放光标下方
+      return { x: Math.max(GAP, rect.left - BW / 2), y: rect.bottom + GAP };
     }
+    // 无选区，居中
+    return { x: (window.innerWidth - BW) / 2, y: window.innerHeight / 3 };
+  }
+
+  // ======== 触发解释 ========
+  function triggerExplain(text) {
+    const pos = calcBubblePos();
 
     currentMode = text.length <= 10 ? 'word' : 'passage';
-    bubble = createBubble(x, y);
+    bubble = createBubble(pos.x, pos.y);
 
     conversation.push({ role: 'user', content: text });
 
@@ -354,8 +404,8 @@
     removeBadge();
 
     currentMode = 'word';
-    const x = window.innerWidth / 2;
-    const y = window.scrollY + 20;
+    const x = (window.innerWidth - 360) / 2;
+    const y = 60;
     bubble = createBubble(x, y);
     conversation.push({ role: 'user', content: text });
 
@@ -398,7 +448,6 @@
 
   // ======== 键盘事件 ========
   document.addEventListener('keydown', (e) => {
-    // 双击 Ctrl：切换多词模式
     if (e.key === 'Control' && !e.repeat) {
       const now = Date.now();
       if (now - lastCtrlTime < 500) {
@@ -452,6 +501,7 @@
 
   // ======== 点击气泡外关闭 ========
   document.addEventListener('mousedown', (e) => {
+    if (isDragging) return;
     if (bubble && !bubble.contains(e.target)) {
       removeBubble();
     }

@@ -5,7 +5,7 @@
 
 /* ======== 气泡主体 ======== */
 .text-explainer-bubble {
-  position: absolute;
+  position: fixed;
   z-index: 2147483647;
   width: 360px;
   max-height: 520px;
@@ -64,7 +64,12 @@
   letter-spacing: -0.01em;
   color: #8e8e93;
   text-transform: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
 }
+
+.te-header:active { cursor: grabbing; }
 
 @media (prefers-color-scheme: dark) {
   .te-header { color: #98989d; }
