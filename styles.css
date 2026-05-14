@@ -1,25 +1,55 @@
+/* ============================================
+   划词解释 — Apple 设计风格
+   iOS 蓝 · 毛玻璃 · SF 字体排印 · 弹性动画
+   ============================================ */
+
 /* ======== 气泡主体 ======== */
 .text-explainer-bubble {
   position: absolute;
   z-index: 2147483647;
-  width: 380px;
-  max-height: 500px;
+  width: 360px;
+  max-height: 520px;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  font-size: 14px;
-  line-height: 1.7;
-  color: #333;
-  animation: te-fadeIn 0.2s ease;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 24px;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    0 8px 32px rgba(0, 0, 0, 0.12);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: -0.022em;
+  line-height: 1.47059;
+  color: #1d1d1f;
+  animation: te-bubbleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
 }
 
-@keyframes te-fadeIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* 暗色网页下的自动适配 */
+@media (prefers-color-scheme: dark) {
+  .text-explainer-bubble {
+    background: rgba(28, 28, 30, 0.88);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f5f5f7;
+  }
+}
+
+@keyframes te-bubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ======== 标题栏 ======== */
@@ -27,158 +57,306 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid #f0f0f0;
-  font-weight: 600;
-  font-size: 13px;
-  color: #666;
+  padding: 14px 18px 10px;
   flex-shrink: 0;
+  font-weight: 590;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: #8e8e93;
+  text-transform: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .te-header { color: #98989d; }
 }
 
 .te-close {
-  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.06);
   border: none;
-  font-size: 20px;
-  color: #999;
+  border-radius: 50%;
+  font-size: 14px;
+  color: #8e8e93;
   cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.te-close:hover { color: #333; }
+
+.te-close:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: #1d1d1f;
+}
+
+@media (prefers-color-scheme: dark) {
+  .te-close { background: rgba(255,255,255,0.12); color: #98989d; }
+  .te-close:hover { background: rgba(255,255,255,0.2); color: #f5f5f7; }
+}
 
 /* ======== 内容区（可滚动消息列表） ======== */
 .te-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 14px;
-  min-height: 60px;
+  padding: 6px 16px 8px;
+  min-height: 40px;
+  scroll-behavior: smooth;
 }
 
+.te-body::-webkit-scrollbar {
+  width: 3px;
+}
+
+.te-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .te-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* ======== 加载状态 ======== */
 .te-loading {
   text-align: center;
-  color: #999;
-  padding: 16px 0;
+  color: #8e8e93;
+  padding: 20px 0;
+  font-size: 13px;
+  letter-spacing: -0.01em;
 }
 
 /* ======== 消息气泡 ======== */
 .te-msg {
   margin-bottom: 8px;
+  animation: te-msgIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+@keyframes te-msgIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 用户消息 — 蓝底白字（类 iMessage） */
 .te-msg-user {
-  background: #f0f0ff;
-  border-radius: 10px;
+  background: #007aff;
+  border-radius: 14px;
   padding: 8px 12px;
+  margin-left: 12px;
+  animation: te-msgIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.te-msg-ai {
-  padding: 4px 0;
-}
-
-.te-msg-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #999;
+.te-msg-user .te-msg-label {
+  font-size: 10px;
+  font-weight: 590;
+  color: rgba(255, 255, 255, 0.7);
   margin-bottom: 2px;
   display: block;
+  letter-spacing: 0.02em;
 }
 
-.te-msg-user .te-msg-label { color: #667eea; }
-.te-msg-ai .te-msg-label { color: #16a34a; }
+.te-msg-user p {
+  margin: 0;
+  font-size: 14px;
+  color: #fff;
+  letter-spacing: -0.022em;
+}
 
-.te-msg-user p { margin: 0; font-size: 13px; color: #333; }
+/* AI 消息 — 浅灰底 */
+.te-msg-ai {
+  background: #f2f2f7;
+  border-radius: 14px;
+  padding: 8px 12px;
+  margin-right: 8px;
+}
 
-.te-msg-content p { margin: 0 0 6px; }
+@media (prefers-color-scheme: dark) {
+  .te-msg-ai { background: rgba(255, 255, 255, 0.08); }
+}
+
+.te-msg-ai .te-msg-label {
+  font-size: 10px;
+  font-weight: 590;
+  color: #8e8e93;
+  margin-bottom: 2px;
+  display: block;
+  letter-spacing: 0.02em;
+}
+
+.te-msg-content p {
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.47059;
+}
+
 .te-msg-content p:last-child { margin-bottom: 0; }
 
 /* 追问分隔线 */
 .te-msg-divider {
-  border-top: 1px dashed #e8e8e8;
-  margin: 10px 0;
+  margin: 6px 0;
+  border-top: 1px solid #e5e5ea;
 }
 
-/* 思考中 */
+@media (prefers-color-scheme: dark) {
+  .te-msg-divider { border-color: rgba(255,255,255,0.1); }
+}
+
+/* 思考中动画 */
 .te-msg-loading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
-  color: #aaa;
+  color: #8e8e93;
   padding: 6px 0;
-  animation: te-pulse 1s ease infinite;
 }
 
-@keyframes te-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+.te-msg-loading::after {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  background: #8e8e93;
+  border-radius: 50%;
+  animation: te-dotPulse 1.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@keyframes te-dotPulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50%      { opacity: 1;   transform: scale(1);   }
 }
 
 /* 错误消息 */
 .te-error-msg {
-  color: #e74c3c;
+  color: #ff3b30;
   font-size: 13px;
   padding: 8px 0;
 }
 
 /* ======== Markdown 渲染 ======== */
 .te-md-h3 {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin: 10px 0 4px;
+  font-size: 15px;
+  font-weight: 590;
+  color: #1d1d1f;
+  margin: 8px 0 4px;
+  letter-spacing: -0.022em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .te-md-h3 { color: #f5f5f7; }
 }
 
 .te-md-code {
-  background: #f5f5f5;
-  border: 1px solid #e8e8e8;
-  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  border-radius: 4px;
   padding: 1px 5px;
   font-size: 13px;
-  font-family: "SF Mono", Consolas, monospace;
+  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  letter-spacing: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .te-md-code { background: rgba(255,255,255,0.12); }
 }
 
 .te-md-ul {
   margin: 4px 0;
-  padding-left: 18px;
+  padding-left: 16px;
 }
 
 .te-md-li {
   margin-bottom: 2px;
+  font-size: 14px;
+}
+
+.te-md-li::marker { color: #8e8e93; }
+
+/* 正文加粗 */
+.te-msg-content strong {
+  font-weight: 590;
 }
 
 /* ======== 追问输入栏 ======== */
 .te-input-bar {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   padding: 8px 14px 10px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid #e5e5ea;
   flex-shrink: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .te-input-bar { border-color: rgba(255,255,255,0.1); }
 }
 
 .te-input {
   flex: 1;
-  padding: 7px 10px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
   font-family: inherit;
+  font-weight: 400;
+  letter-spacing: -0.022em;
   outline: none;
-  background: #fafafa;
+  background: #f2f2f7;
+  color: #1d1d1f;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+@media (prefers-color-scheme: dark) {
+  .te-input {
+    background: rgba(255,255,255,0.1);
+    color: #f5f5f7;
+  }
+}
+
 .te-input:focus {
-  border-color: #4f46e5;
   background: #fff;
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  .te-input:focus {
+    background: rgba(255,255,255,0.15);
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.5);
+  }
+}
+
+.te-input::placeholder {
+  color: #aeaeb2;
 }
 
 .te-send-btn {
-  padding: 7px 14px;
-  background: #4f46e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  background: #007aff;
   color: #fff;
   border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
+  border-radius: 50%;
+  font-size: 15px;
+  font-weight: 590;
   cursor: pointer;
-  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.te-send-btn:hover { background: #4338ca; }
+
+.te-send-btn:hover {
+  background: #0056cc;
+  transform: scale(1.05);
+}
+
+.te-send-btn:active {
+  transform: scale(0.95);
+  transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
 /* ======== 收藏按钮 ======== */
 .te-bubble-actions {
@@ -188,23 +366,29 @@
 
 .te-save-btn {
   width: 100%;
-  padding: 6px 0;
-  background: none;
-  border: 1px dashed #ccc;
-  border-radius: 6px;
-  color: #888;
-  font-size: 12px;
+  padding: 8px 0;
+  background: rgba(0, 122, 255, 0.06);
+  border: none;
+  border-radius: 12px;
+  color: #007aff;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
 .te-save-btn:hover {
-  border-color: #f59e0b;
-  color: #d97706;
-  background: #fffbeb;
+  background: rgba(0, 122, 255, 0.12);
 }
+
+.te-save-btn:active {
+  background: rgba(0, 122, 255, 0.18);
+}
+
 .te-save-btn:disabled {
-  border-color: #16a34a;
-  color: #16a34a;
+  background: rgba(52, 199, 89, 0.08);
+  color: #34c759;
   cursor: default;
 }
 
@@ -212,36 +396,62 @@
 #te-green-dot {
   position: fixed;
   z-index: 2147483646;
-  width: 8px;
-  height: 8px;
-  background: #22c55e;
+  width: 10px;
+  height: 10px;
+  background: #34c759;
   border-radius: 50%;
-  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+  box-shadow: 0 0 8px rgba(52, 199, 89, 0.5);
   pointer-events: none;
-  animation: te-fadeIn 0.15s ease;
+  animation: te-fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes te-fadeIn {
+  from { opacity: 0; transform: scale(0.5); }
+  to   { opacity: 1; transform: scale(1);   }
 }
 
 /* ======== 多词高亮 ======== */
 .te-highlight {
-  background: #fef08a;
-  border-radius: 2px;
-  padding: 0 1px;
+  background: #fff3bf;
+  border-radius: 3px;
+  padding: 0 2px;
+  color: inherit;
 }
 
 /* ======== 多词计数徽章 ======== */
 #te-count-badge {
   position: fixed;
   z-index: 2147483647;
-  top: 12px;
+  top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  background: #1a1a1a;
+  background: rgba(28, 28, 30, 0.88);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
   color: #fff;
-  padding: 8px 20px;
+  padding: 10px 22px;
   border-radius: 20px;
   font-size: 13px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  animation: te-fadeIn 0.15s ease;
+  font-weight: 590;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.01em;
+  box-shadow:
+    0 0 0 0.5px rgba(255,255,255,0.1),
+    0 2px 12px rgba(0,0,0,0.2);
+  animation: te-badgeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
+}
+
+@keyframes te-badgeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0);   }
+}
+
+/* ======== 暗色网页下的徽章 ======== */
+@media (prefers-color-scheme: dark) {
+  #te-count-badge {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+  }
 }
