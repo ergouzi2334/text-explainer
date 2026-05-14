@@ -185,7 +185,7 @@
     var ball = document.createElement('div');
     ball.id = 'te-float-ball';
     ball.textContent = label;
-    ball.title = '点击展开对话 · 双击关闭';
+    ball.title = '点击展开对话 · 拖拽移动 · 双击关闭';
     ball.style.left = Math.max(8, Math.min(x, window.innerWidth - 52)) + 'px';
     ball.style.top = Math.max(8, Math.min(y, window.innerHeight - 52)) + 'px';
     document.body.appendChild(ball);
@@ -200,6 +200,18 @@
     });
     ball.appendChild(closeBtn);
 
+    // 点击展开
+    ball.addEventListener('click', function (e) {
+      if (e.target === closeBtn) return;
+      expandFromBall();
+    });
+
+    // 双击关闭
+    ball.addEventListener('dblclick', function (e) {
+      if (e.target === closeBtn) return;
+      removeFloatBall();
+    });
+
     // 拖拽
     var dragging = false, sx, sy, bx, by;
     ball.addEventListener('mousedown', function (e) {
@@ -209,6 +221,7 @@
       bx = ball.offsetLeft; by = ball.offsetTop;
       ball.style.transition = 'none';
       e.preventDefault();
+      e.stopPropagation();
     });
 
     function onBallMove(e) {
@@ -222,26 +235,13 @@
     }
 
     function onBallUp(e) {
-      if (!dragging) return;
       dragging = false;
       ball.style.transition = '';
-      // 如果几乎没有移动，视为点击展开
-      var moved = Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy);
-      if (moved < 5) {
-        document.removeEventListener('mousemove', onBallMove);
-        document.removeEventListener('mouseup', onBallUp);
-        expandFromBall();
-      }
     }
-
-    ball.addEventListener('dblclick', function () {
-      document.removeEventListener('mousemove', onBallMove);
-      document.removeEventListener('mouseup', onBallUp);
-      removeFloatBall();
-    });
 
     document.addEventListener('mousemove', onBallMove);
     document.addEventListener('mouseup', onBallUp);
+
     floatBall = ball;
   }
 
