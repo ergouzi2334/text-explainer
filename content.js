@@ -2,7 +2,7 @@
   let bubble = null;
   let bubbleBody = null;
   let bubbleInput = null;
-  let conversation = [];       // [{role:'user'|'assistant', content}]
+  let conversation = [];
   let multiMode = false;
   let pendingWords = [];
   let highlights = [];
@@ -11,12 +11,16 @@
   let lastSelection = '';
   let lastRange = null;
   let lastCtrlTime = 0;
-  let currentMode = 'word';    // 'word' | 'passage'
+  let currentMode = 'word';
 
-  // ======== 拖拽状态 ========
+  // 拖拽
   let isDragging = false;
   let dragStartX = 0, dragStartY = 0;
   let bubbleStartX = 0, bubbleStartY = 0;
+
+  // 悬浮球
+  let floatBall = null;
+  let collapsedState = null;  // 收起时保存的对话状态
 
   function onDragMove(e) {
     if (!isDragging || !bubble) return;
@@ -41,7 +45,7 @@
     bubble.style.top = top + 'px';
   }
 
-  // ======== Markdown 渲染 ========
+  // ======== Markdown ========
   function renderMarkdown(text) {
     let html = text
       .replace(/&/g, '&amp;')
@@ -59,7 +63,7 @@
     return html;
   }
 
-  // ======== 知识库存储 ========
+  // ======== 知识库 ========
   const DB_NAME = 'te-knowledge';
   const DB_VERSION = 1;
 
@@ -84,20 +88,12 @@
       const db = await openDB();
       const tx = db.transaction('entries', 'readwrite');
       const store = tx.objectStore('entries');
-      store.add({
-        text,
-        explanation,
-        conversation: [...conversation],
-        createdAt: Date.now(),
-      });
+      store.add({ text, explanation, conversation: [...conversation], createdAt: Date.now() });
       return new Promise((resolve) => {
         tx.oncomplete = () => { db.close(); resolve(true); };
         tx.onerror = () => { db.close(); resolve(false); };
       });
-    } catch (e) {
-      console.error('知识库保存失败:', e);
-      return false;
-    }
+    } catch (e) { return false; }
   }
 
   // ======== 小绿点 ========
@@ -130,11 +126,123 @@
       countBadge.id = 'te-count-badge';
       document.body.appendChild(countBadge);
     }
-    countBadge.textContent = `已选 ${pendingWords.length} 个 · Enter 解释 · Esc 退出`;
+    countBadge.textContent = '已选 ' + pendingWords.length + ' 个 · Enter 解释 · Esc 退出';
   }
 
   function removeBadge() {
     if (countBadge) { countBadge.remove(); countBadge = null; }
+  }
+
+  // ======== 悬浮球 ========
+  function removeFloatBall() {
+    if (floatBall) { floatBall.remove(); floatBall = null; }
+    collapsedState = null;
+  }
+
+  function collapseToBall() {
+    if (!bubble) return;
+    var label = conversation[0] ? conversation[0].content.substring(0, 2) : '···';
+    collapsedState = {
+      conversation: conversation.slice(),
+      currentMode: currentMode,
+    };
+    var bx = bubble.offsetLeft;
+    var by = bubble.offsetTop;
+    bubble.style.display = 'none';
+    createFloatBall(bx + 170, by + 10, label);
+  }
+
+  function expandFromBall() {
+    if (!floatBall || !collapsedState) return;
+    var saved = collapsedState;
+    var fx = floatBall.offsetLeft - 170;
+    var fy = floatBall.offsetTop - 10;
+    removeFloatBall();
+    if (bubble) { bubble.remove(); bubble = null; }
+    bubble = createBubble(fx, fy);
+    conversation = saved.conversation;
+    currentMode = saved.currentMode;
+    // 重建消息列表
+    var headerSpan = bubble.querySelector('.te-header span');
+    headerSpan.textContent = currentMode === 'word' ? '解释' : '深度解读';
+    bubbleBody.innerHTML = '';
+    for (var i = 1; i < conversation.length; i++) {
+      // 跳过第一条 user 消息（原始文本），只显示 AI 回答和后续追问
+      if (i === 1 && conversation[i].role === 'assistant') {
+        addBubbleMessage('assistant', conversation[i].content);
+      } else if (i > 1) {
+        addBubbleMessage(conversation[i].role, conversation[i].content);
+      }
+    }
+    bubble.querySelector('.te-input-bar').style.display = 'flex';
+    bubble.querySelector('.te-bubble-actions').style.display = 'flex';
+    bubbleInput = bubble.querySelector('.te-input');
+    bubbleInput.focus();
+  }
+
+  function createFloatBall(x, y, label) {
+    removeFloatBall();
+    var ball = document.createElement('div');
+    ball.id = 'te-float-ball';
+    ball.textContent = label;
+    ball.title = '点击展开对话 · 双击关闭';
+    ball.style.left = Math.max(8, Math.min(x, window.innerWidth - 52)) + 'px';
+    ball.style.top = Math.max(8, Math.min(y, window.innerHeight - 52)) + 'px';
+    document.body.appendChild(ball);
+
+    // 小关闭按钮
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'te-ball-close';
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      removeFloatBall();
+    });
+    ball.appendChild(closeBtn);
+
+    // 拖拽
+    var dragging = false, sx, sy, bx, by;
+    ball.addEventListener('mousedown', function (e) {
+      if (e.target === closeBtn) return;
+      dragging = true;
+      sx = e.clientX; sy = e.clientY;
+      bx = ball.offsetLeft; by = ball.offsetTop;
+      ball.style.transition = 'none';
+      e.preventDefault();
+    });
+
+    function onBallMove(e) {
+      if (!dragging) return;
+      var nx = bx + e.clientX - sx;
+      var ny = by + e.clientY - sy;
+      nx = Math.max(8, Math.min(nx, window.innerWidth - 52));
+      ny = Math.max(8, Math.min(ny, window.innerHeight - 52));
+      ball.style.left = nx + 'px';
+      ball.style.top = ny + 'px';
+    }
+
+    function onBallUp(e) {
+      if (!dragging) return;
+      dragging = false;
+      ball.style.transition = '';
+      // 如果几乎没有移动，视为点击展开
+      var moved = Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy);
+      if (moved < 5) {
+        document.removeEventListener('mousemove', onBallMove);
+        document.removeEventListener('mouseup', onBallUp);
+        expandFromBall();
+      }
+    }
+
+    ball.addEventListener('dblclick', function () {
+      document.removeEventListener('mousemove', onBallMove);
+      document.removeEventListener('mouseup', onBallUp);
+      removeFloatBall();
+    });
+
+    document.addEventListener('mousemove', onBallMove);
+    document.addEventListener('mouseup', onBallUp);
+    floatBall = ball;
   }
 
   // ======== 气泡 ========
@@ -146,47 +254,49 @@
     bubbleBody = null;
     bubbleInput = null;
     conversation = [];
+    removeFloatBall();
   }
 
   function createBubble(x, y) {
     removeBubble();
     conversation = [];
 
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.className = 'text-explainer-bubble';
 
-    div.innerHTML = `
-      <div class="te-header">
-        <span>解释中...</span>
-        <button class="te-close">&times;</button>
-      </div>
-      <div class="te-body">
-        <div class="te-loading">正在请教 AI...</div>
-      </div>
-      <div class="te-input-bar" style="display:none">
-        <input type="text" class="te-input" placeholder="输入追问...">
-        <button class="te-send-btn">↑</button>
-      </div>
-      <div class="te-bubble-actions" style="display:none">
-        <button class="te-save-btn">☆ 收藏到知识库</button>
-      </div>`;
+    var headerHtml = '<div class="te-header">';
+    headerHtml += '<span>解释中...</span>';
+    headerHtml += '<div class="te-header-actions">';
+    headerHtml += '<button class="te-btn-collapse" title="收起为悬浮球">&minus;</button>';
+    headerHtml += '<button class="te-btn-close" title="关闭">&times;</button>';
+    headerHtml += '</div></div>';
+
+    div.innerHTML = headerHtml +
+      '<div class="te-body"><div class="te-loading">正在请教 AI...</div></div>' +
+      '<div class="te-input-bar" style="display:none">' +
+      '<input type="text" class="te-input" placeholder="输入追问...">' +
+      '<button class="te-send-btn">↑</button>' +
+      '</div>' +
+      '<div class="te-bubble-actions" style="display:none">' +
+      '<button class="te-save-btn">☆ 收藏到知识库</button>' +
+      '</div>';
 
     document.body.appendChild(div);
 
     bubble = div;
     bubbleBody = div.querySelector('.te-body');
 
-    // 初始定位（fixed 定位，viewport 坐标）
-    const bw = 360;
-    let left = Math.min(x, window.innerWidth - bw - 10);
+    // 初始定位
+    var bw = 360;
+    var left = Math.min(x, window.innerWidth - bw - 10);
     left = Math.max(left, 10);
     div.style.left = left + 'px';
     div.style.top = Math.max(10, Math.min(y, window.innerHeight - 320)) + 'px';
 
-    // ======== 拖拽 ========
-    const header = div.querySelector('.te-header');
-    header.addEventListener('mousedown', (e) => {
-      if (e.target.classList.contains('te-close')) return;
+    // 拖拽
+    var header = div.querySelector('.te-header');
+    header.addEventListener('mousedown', function (e) {
+      if (e.target.closest('.te-header-actions')) return;
       isDragging = true;
       dragStartX = e.clientX;
       dragStartY = e.clientY;
@@ -199,15 +309,18 @@
     document.addEventListener('mousemove', onDragMove);
     document.addEventListener('mouseup', onDragEnd);
 
-    // ======== 关闭按钮 ========
-    div.querySelector('.te-close').addEventListener('click', removeBubble);
+    // 收起按钮
+    div.querySelector('.te-btn-collapse').addEventListener('click', collapseToBall);
 
-    // ======== 追问输入 ========
+    // 关闭按钮
+    div.querySelector('.te-btn-close').addEventListener('click', removeBubble);
+
+    // 追问输入
     bubbleInput = div.querySelector('.te-input');
-    bubbleInput.addEventListener('keydown', (e) => {
+    bubbleInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        const q = bubbleInput.value.trim();
+        var q = bubbleInput.value.trim();
         if (!q) return;
         bubbleInput.value = '';
         addUserMessage(q);
@@ -215,26 +328,26 @@
       }
     });
 
-    div.querySelector('.te-send-btn').addEventListener('click', () => {
-      const q = bubbleInput.value.trim();
+    div.querySelector('.te-send-btn').addEventListener('click', function () {
+      var q = bubbleInput.value.trim();
       if (!q) return;
       bubbleInput.value = '';
       addUserMessage(q);
       doFollowup(q);
     });
 
-    // ======== 收藏按钮 ========
-    div.querySelector('.te-save-btn').addEventListener('click', async () => {
-      const originalText = conversation[0]?.content || '';
-      const explanation = conversation[1]?.content || '';
-      const ok = await saveToKnowledge(originalText, explanation);
-      const btn = div.querySelector('.te-save-btn');
+    // 收藏
+    div.querySelector('.te-save-btn').addEventListener('click', async function () {
+      var originalText = conversation[0] ? conversation[0].content : '';
+      var explanation = conversation[1] ? conversation[1].content : '';
+      var ok = await saveToKnowledge(originalText, explanation);
+      var btn = div.querySelector('.te-save-btn');
       if (ok) {
         btn.textContent = '★ 已收藏';
         btn.disabled = true;
       } else {
         btn.textContent = '✕ 收藏失败';
-        setTimeout(() => { btn.textContent = '☆ 收藏到知识库'; }, 1500);
+        setTimeout(function () { btn.textContent = '☆ 收藏到知识库'; }, 1500);
       }
     });
 
@@ -243,7 +356,7 @@
 
   function showResult(content) {
     if (!bubble) return;
-    conversation.push({ role: 'assistant', content });
+    conversation.push({ role: 'assistant', content: content });
 
     bubble.querySelector('.te-header span').textContent = currentMode === 'word' ? '解释' : '深度解读';
     bubbleBody.innerHTML = '';
@@ -256,17 +369,17 @@
 
   function addBubbleMessage(role, content) {
     if (!bubbleBody) return;
-    const msg = document.createElement('div');
+    var msg = document.createElement('div');
     msg.className = role === 'user' ? 'te-msg te-msg-user' : 'te-msg te-msg-ai';
 
     if (role === 'user') {
-      msg.innerHTML = `<span class="te-msg-label">追问</span><p>${content}</p>`;
+      msg.innerHTML = '<span class="te-msg-label">追问</span><p>' + content + '</p>';
     } else {
-      msg.innerHTML = `<span class="te-msg-label">AI</span><div class="te-msg-content">${renderMarkdown(content)}</div>`;
+      msg.innerHTML = '<span class="te-msg-label">AI</span><div class="te-msg-content">' + renderMarkdown(content) + '</div>';
     }
 
-    if (conversation.filter(c => c.role === 'user').length > 1) {
-      const divider = document.createElement('div');
+    if (conversation.filter(function (c) { return c.role === 'user'; }).length > 1) {
+      var divider = document.createElement('div');
       divider.className = 'te-msg-divider';
       bubbleBody.appendChild(divider);
     }
@@ -279,7 +392,7 @@
     conversation.push({ role: 'user', content: text });
     addBubbleMessage('user', text);
 
-    const loading = document.createElement('div');
+    var loading = document.createElement('div');
     loading.className = 'te-msg-loading';
     loading.textContent = 'AI 思考中...';
     bubbleBody.appendChild(loading);
@@ -287,29 +400,29 @@
   }
 
   function removeLastLoading() {
-    const loadings = bubbleBody.querySelectorAll('.te-msg-loading');
-    loadings.forEach(el => el.remove());
+    var loadings = bubbleBody.querySelectorAll('.te-msg-loading');
+    loadings.forEach(function (el) { el.remove(); });
   }
 
   function showError(msg) {
     if (!bubble) return;
     bubble.querySelector('.te-header span').textContent = '出错了';
-    bubbleBody.innerHTML = `<div class="te-error-msg"><p>${msg}</p></div>`;
+    bubbleBody.innerHTML = '<div class="te-error-msg"><p>' + msg + '</p></div>';
   }
 
-  // ======== 高亮选中 ========
+  // ======== 高亮 ========
   function highlightSelection(range) {
     try {
-      const span = document.createElement('span');
+      var span = document.createElement('span');
       span.className = 'te-highlight';
       range.surroundContents(span);
       highlights.push(span);
-    } catch (e) { /* 跨元素选中会失败 */ }
+    } catch (e) {}
   }
 
   function removeAllHighlights() {
-    highlights.forEach(el => {
-      const parent = el.parentNode;
+    highlights.forEach(function (el) {
+      var parent = el.parentNode;
       if (parent) {
         while (el.firstChild) parent.insertBefore(el.firstChild, el);
         parent.removeChild(el);
@@ -319,7 +432,7 @@
     highlights = [];
   }
 
-  // ======== 关闭多词模式 ========
+  // ======== 多词模式 ========
   function exitMultiMode() {
     multiMode = false;
     pendingWords = [];
@@ -331,43 +444,36 @@
     removeBubble();
   }
 
-  // ======== 计算气泡位置（选中文字旁边） ========
+  // ======== 计算气泡位置 ========
   function calcBubblePos() {
-    const sel = window.getSelection();
-    const BW = 370;
-    const GAP = 12;
+    var sel = window.getSelection();
+    var BW = 370;
+    var GAP = 12;
 
     if (sel && sel.rangeCount > 0) {
-      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      var rect = sel.getRangeAt(0).getBoundingClientRect();
       if (rect.width > 0) {
-        // 优先放在选中区域右侧
         if (rect.right + BW + GAP < window.innerWidth) {
           return { x: rect.right + GAP, y: rect.top - 10 };
         }
-        // 右侧不够，放左侧
         if (rect.left - BW - GAP > 0) {
           return { x: rect.left - BW - GAP, y: rect.top - 10 };
         }
-        // 两侧都不够，放下方
         return { x: Math.max(GAP, rect.left), y: rect.bottom + GAP };
       }
-      // 选区宽度为 0（光标），放光标下方
       return { x: Math.max(GAP, rect.left - BW / 2), y: rect.bottom + GAP };
     }
-    // 无选区，居中
     return { x: (window.innerWidth - BW) / 2, y: window.innerHeight / 3 };
   }
 
   // ======== 触发解释 ========
   function triggerExplain(text) {
-    const pos = calcBubblePos();
-
+    var pos = calcBubblePos();
     currentMode = text.length <= 10 ? 'word' : 'passage';
     bubble = createBubble(pos.x, pos.y);
-
     conversation.push({ role: 'user', content: text });
 
-    chrome.runtime.sendMessage({ type: 'explain', text, mode: currentMode }, (res) => {
+    chrome.runtime.sendMessage({ type: 'explain', text: text, mode: currentMode }, function (res) {
       if (chrome.runtime.lastError) { showError('通信失败，请刷新页面后重试'); return; }
       if (res.success) { showResult(res.content); }
       else { showError(res.error); }
@@ -376,21 +482,20 @@
 
   // ======== 追问 ========
   function doFollowup(question) {
-    const history = [
-      { role: 'system', content: '继续对话' },
-      ...conversation.map(c => ({ role: c.role, content: c.content })),
-    ];
+    var history = [
+      { role: 'system', content: '继续对话' }
+    ].concat(conversation.map(function (c) { return { role: c.role, content: c.content }; }));
 
-    chrome.runtime.sendMessage({ type: 'followup', history }, (res) => {
+    chrome.runtime.sendMessage({ type: 'followup', history: history }, function (res) {
       removeLastLoading();
       if (chrome.runtime.lastError) { showError('通信失败'); return; }
       if (res.success) {
         conversation.push({ role: 'assistant', content: res.content });
         addBubbleMessage('assistant', res.content);
       } else {
-        const errMsg = document.createElement('div');
+        var errMsg = document.createElement('div');
         errMsg.className = 'te-error-msg';
-        errMsg.innerHTML = `<p>追问失败：${res.error}</p>`;
+        errMsg.innerHTML = '<p>追问失败：' + res.error + '</p>';
         bubbleBody.appendChild(errMsg);
       }
     });
@@ -398,25 +503,25 @@
 
   function explainBatch() {
     if (pendingWords.length === 0) return;
-    const words = [...pendingWords];
-    const text = words.join('、');
+    var words = pendingWords.slice();
+    var text = words.join('、');
     pendingWords = [];
     removeBadge();
 
     currentMode = 'word';
-    const x = (window.innerWidth - 360) / 2;
-    const y = 60;
+    var x = (window.innerWidth - 360) / 2;
+    var y = 60;
     bubble = createBubble(x, y);
     conversation.push({ role: 'user', content: text });
 
-    chrome.runtime.sendMessage({ type: 'explain', text, mode: 'batch' }, (res) => {
+    chrome.runtime.sendMessage({ type: 'explain', text: text, mode: 'batch' }, function (res) {
       if (chrome.runtime.lastError) { showError('通信失败'); return; }
       if (res.success) {
         conversation.push({ role: 'assistant', content: res.content });
         bubble.querySelector('.te-header span').textContent = '多词解释';
         bubbleBody.innerHTML = '';
-        const lines = res.content.split('\n').filter(l => l.trim());
-        bubbleBody.innerHTML = lines.map(l => `<p>${l}</p>`).join('');
+        var lines = res.content.split('\n').filter(function (l) { return l.trim(); });
+        bubbleBody.innerHTML = lines.map(function (l) { return '<p>' + l + '</p>'; }).join('');
         bubble.querySelector('.te-input-bar').style.display = 'flex';
         bubble.querySelector('.te-bubble-actions').style.display = 'flex';
       } else {
@@ -426,15 +531,16 @@
   }
 
   // ======== 鼠标事件 ========
-  document.addEventListener('mousemove', (e) => {
+  document.addEventListener('mousemove', function (e) {
     if (multiMode) moveGreenDot(e.clientX, e.clientY);
   });
 
-  document.addEventListener('mouseup', (e) => {
-    const sel = window.getSelection();
-    const text = (sel?.toString() || '').trim();
+  document.addEventListener('mouseup', function (e) {
+    var sel = window.getSelection();
+    var text = (sel ? sel.toString() : '').trim();
     if (!text || text.length > 2000) return;
     if (bubble && bubble.contains(e.target)) return;
+    if (floatBall && floatBall.contains(e.target)) return;
 
     if (multiMode) {
       lastSelection = text;
@@ -447,15 +553,14 @@
   });
 
   // ======== 键盘事件 ========
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', function (e) {
     if (e.key === 'Control' && !e.repeat) {
-      const now = Date.now();
+      var now = Date.now();
       if (now - lastCtrlTime < 500) {
         e.preventDefault();
         e.stopPropagation();
-        if (multiMode) {
-          exitMultiMode();
-        } else {
+        if (multiMode) { exitMultiMode(); }
+        else {
           multiMode = true;
           pendingWords = [];
           lastSelection = '';
@@ -474,7 +579,7 @@
     if (e.code === 'Space') {
       e.preventDefault();
       e.stopPropagation();
-      if (lastSelection && !pendingWords.includes(lastSelection)) {
+      if (lastSelection && pendingWords.indexOf(lastSelection) === -1) {
         pendingWords.push(lastSelection);
         if (lastRange) highlightSelection(lastRange);
         lastSelection = '';
@@ -499,11 +604,12 @@
     }
   }, true);
 
-  // ======== 点击气泡外关闭 ========
-  document.addEventListener('mousedown', (e) => {
+  // ======== 点击外部 ========
+  document.addEventListener('mousedown', function (e) {
     if (isDragging) return;
+    if (floatBall && floatBall.contains(e.target)) return;
     if (bubble && !bubble.contains(e.target)) {
-      removeBubble();
+      // 不关闭气泡，由用户点关闭按钮或收起控制
     }
   });
 })();

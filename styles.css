@@ -57,7 +57,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 18px 10px;
+  padding: 14px 14px 10px;
   flex-shrink: 0;
   font-weight: 590;
   font-size: 13px;
@@ -71,11 +71,13 @@
 
 .te-header:active { cursor: grabbing; }
 
-@media (prefers-color-scheme: dark) {
-  .te-header { color: #98989d; }
+.te-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.te-close {
+.te-header-actions button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -90,14 +92,24 @@
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.te-close:hover {
+.te-header-actions button:hover {
   background: rgba(0, 0, 0, 0.12);
   color: #1d1d1f;
 }
 
+.te-btn-collapse {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+}
+
 @media (prefers-color-scheme: dark) {
-  .te-close { background: rgba(255,255,255,0.12); color: #98989d; }
-  .te-close:hover { background: rgba(255,255,255,0.2); color: #f5f5f7; }
+  .te-header-actions button { background: rgba(255,255,255,0.12); color: #98989d; }
+  .te-header-actions button:hover { background: rgba(255,255,255,0.2); color: #f5f5f7; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .te-header { color: #98989d; }
 }
 
 /* ======== 内容区（可滚动消息列表） ======== */
@@ -458,5 +470,75 @@
     background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(16px) saturate(180%);
     -webkit-backdrop-filter: blur(16px) saturate(180%);
+  }
+}
+
+/* ======== 悬浮球 ======== */
+#te-float-ball {
+  position: fixed;
+  z-index: 2147483647;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    0 4px 20px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  font-size: 12px;
+  font-weight: 590;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.01em;
+  color: #007aff;
+  animation: te-ballIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#te-float-ball:active { cursor: grabbing; }
+
+#te-float-ball:hover {
+  transform: scale(1.08);
+}
+
+#te-float-ball .te-ball-close {
+  display: none;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+#te-float-ball:hover .te-ball-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes te-ballIn {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-color-scheme: dark) {
+  #te-float-ball {
+    background: rgba(28, 28, 30, 0.88);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #0a84ff;
   }
 }
