@@ -200,19 +200,13 @@
     });
     ball.appendChild(closeBtn);
 
-    // 点击展开
-    ball.addEventListener('click', function (e) {
-      if (e.target === closeBtn) return;
-      expandFromBall();
-    });
-
     // 双击关闭
     ball.addEventListener('dblclick', function (e) {
       if (e.target === closeBtn) return;
       removeFloatBall();
     });
 
-    // 拖拽
+    // 拖拽 / 点击（统一在 mouseup 判断）
     var dragging = false, sx, sy, bx, by;
     ball.addEventListener('mousedown', function (e) {
       if (e.target === closeBtn) return;
@@ -221,7 +215,6 @@
       bx = ball.offsetLeft; by = ball.offsetTop;
       ball.style.transition = 'none';
       e.preventDefault();
-      e.stopPropagation();
     });
 
     function onBallMove(e) {
@@ -235,8 +228,13 @@
     }
 
     function onBallUp(e) {
+      if (!dragging) return;
       dragging = false;
       ball.style.transition = '';
+      var moved = Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy);
+      if (moved < 4) {
+        expandFromBall();
+      }
     }
 
     document.addEventListener('mousemove', onBallMove);
