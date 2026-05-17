@@ -19,7 +19,6 @@ const changeBtn = document.getElementById('changeBtn');
 const msg = document.getElementById('msg');
 const translateToggle = document.getElementById('translateToggle');
 const pinToggle = document.getElementById('pinToggle');
-
 chrome.storage.sync.get(['apiKey', 'translateMode', 'pinMode'], ({ apiKey, translateMode, pinMode }) => {
   // 开关初始状态
   translateToggle.checked = translateMode || false;

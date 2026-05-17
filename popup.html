@@ -14,7 +14,9 @@
       letter-spacing: -0.022em;
       line-height: 1.47059;
       color: #1d1d1f;
-      background: #f2f2f7;
+      background: rgba(242, 242, 247, 0.88);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
     }
 
     /* ======== 标签栏 ======== */
@@ -53,10 +55,16 @@
     /* ======== 配置面板 ======== */
     .config-card {
       margin: 12px 16px;
-      background: #fff;
-      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 24px;
       padding: 20px;
-      box-shadow: 0 0 0 0.5px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.04);
+      box-shadow:
+        0 0 0 0.5px rgba(0, 0, 0, 0.04),
+        0 2px 8px rgba(0, 0, 0, 0.06),
+        0 8px 32px rgba(0, 0, 0, 0.08);
     }
 
     .config-card .title {
@@ -89,21 +97,22 @@
 
     .setup input {
       width: 100%;
-      padding: 10px 12px;
-      border: none;
-      border-radius: 10px;
+      padding: 10px 14px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 14px;
       font-size: 13px;
       font-family: "SF Mono", "SFMono-Regular", Consolas, monospace;
       letter-spacing: 0;
       outline: none;
-      background: #f2f2f7;
+      background: rgba(242, 242, 247, 0.6);
       color: #1d1d1f;
       transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .setup input:focus {
-      background: #fff;
-      box-shadow: 0 0 0 2.5px rgba(0, 122, 255, 0.25);
+      background: rgba(255, 255, 255, 0.9);
+      border-color: rgba(0, 122, 255, 0.3);
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
     }
 
     .setup .hint {
@@ -116,11 +125,11 @@
     .btn {
       width: 100%;
       margin-top: 12px;
-      padding: 10px 0;
+      padding: 11px 0;
       background: #007aff;
       color: #fff;
       border: none;
-      border-radius: 12px;
+      border-radius: 14px;
       font-size: 14px;
       font-weight: 590;
       letter-spacing: -0.01em;
@@ -135,6 +144,7 @@
       background: rgba(0,122,255,0.06);
       color: #007aff;
       margin-top: 0;
+      border-radius: 14px;
     }
     .btn.ghost:hover { background: rgba(0,122,255,0.12); }
 
@@ -157,8 +167,8 @@
 
     .divider {
       border: none;
-      border-top: 1px solid #e5e5ea;
-      margin: 12px 0;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+      margin: 14px 0;
     }
 
     /* ======== 收藏夹面板 ======== */
@@ -169,11 +179,14 @@
     }
 
     .fav-item {
-      background: #fff;
-      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 18px;
       padding: 14px;
       margin-bottom: 8px;
-      box-shadow: 0 0 0 0.5px rgba(0,0,0,0.04);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
 
     .fav-item:last-child { margin-bottom: 0; }
@@ -293,6 +306,7 @@
     .toggle-switch input:checked + .toggle-slider::before {
       transform: translateX(20px);
     }
+
   </style>
 </head>
 <body>
@@ -332,7 +346,6 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
-        <div class="divider"></div>
         <button class="btn ghost" id="changeBtn">更换 API Key</button>
       </div>
 
