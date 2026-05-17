@@ -29,6 +29,9 @@
   let dragStartX = 0, dragStartY = 0;
   let bubbleStartX = 0, bubbleStartY = 0;
 
+  // 记住拖拽位置
+  let rememberedPos = null;
+
   // 悬浮球
   let floatBall = null;
   let collapsedState = null;  // 收起时保存的对话状态
@@ -43,7 +46,10 @@
   function onDragEnd() {
     if (!isDragging) return;
     isDragging = false;
-    if (bubble) bubble.style.transition = '';
+    if (bubble) {
+      bubble.style.transition = '';
+      rememberedPos = { x: bubble.offsetLeft, y: bubble.offsetTop };
+    }
   }
 
   function clampBubble(left, top) {
@@ -195,18 +201,9 @@
     bubbleInput = bubble.querySelector('.te-input');
     bubbleInput.focus();
 
-    // 恢复翻译模式按钮状态
-    var translateBtn2 = bubble.querySelector('.te-btn-translate');
-    if (translateBtn2 && translateMode) {
-      translateBtn2.classList.add('active');
-      translateBtn2.title = '翻译模式：开';
-    }
-    // 恢复钉住按钮状态
-    var pinBtn2 = bubble.querySelector('.te-btn-pin');
-    if (pinBtn2 && pinMode) {
-      pinBtn2.classList.add('active');
-      pinBtn2.title = '钉住高亮：开';
-    }
+    // 恢复状态指示器
+    updateTranslateIndicator(bubble.querySelector('.te-btn-translate'));
+    updatePinIndicator(bubble.querySelector('.te-btn-pin'));
   }
 
   function createFloatBall(x, y, label) {
@@ -274,6 +271,7 @@
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('mouseup', onDragEnd);
     isDragging = false;
+    rememberedPos = null;
     if (bubble) { bubble.remove(); bubble = null; }
     bubbleBody = null;
     bubbleInput = null;
@@ -291,8 +289,8 @@
     var headerHtml = '<div class="te-header">';
     headerHtml += '<span>解释中...</span>';
     headerHtml += '<div class="te-header-actions">';
-    headerHtml += '<button class="te-btn-translate" title="翻译模式：点击切换">译</button>';
-    headerHtml += '<button class="te-btn-pin" title="钉住高亮：关闭时保留荧光笔">钉</button>';
+    headerHtml += '<button class="te-btn-translate" title="翻译模式" disabled>译</button>';
+    headerHtml += '<button class="te-btn-pin" title="钉住高亮" disabled>钉</button>';
     headerHtml += '<button class="te-btn-collapse" title="收起为悬浮球">&minus;</button>';
     headerHtml += '<button class="te-btn-close" title="关闭">&times;</button>';
     headerHtml += '</div></div>';
@@ -344,43 +342,13 @@
       removeBubble();
     });
 
-    // 翻译切换按钮
+    // 翻译状态指示
     var translateBtn = div.querySelector('.te-btn-translate');
-    if (translateMode) {
-      translateBtn.classList.add('active');
-      translateBtn.title = '翻译模式：开';
-    }
-    translateBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      translateMode = !translateMode;
-      chrome.storage.sync.set({ translateMode: translateMode });
-      if (translateMode) {
-        translateBtn.classList.add('active');
-        translateBtn.title = '翻译模式：开';
-      } else {
-        translateBtn.classList.remove('active');
-        translateBtn.title = '翻译模式：关';
-      }
-    });
+    updateTranslateIndicator(translateBtn);
 
-    // 钉住按钮
+    // 钉住状态指示
     var pinBtn = div.querySelector('.te-btn-pin');
-    if (pinMode) {
-      pinBtn.classList.add('active');
-      pinBtn.title = '钉住高亮：开';
-    }
-    pinBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      pinMode = !pinMode;
-      chrome.storage.sync.set({ pinMode: pinMode });
-      if (pinMode) {
-        pinBtn.classList.add('active');
-        pinBtn.title = '钉住高亮：开';
-      } else {
-        pinBtn.classList.remove('active');
-        pinBtn.title = '钉住高亮：关';
-      }
-    });
+    updatePinIndicator(pinBtn);
 
     // 追问输入
     bubbleInput = div.querySelector('.te-input');
@@ -629,6 +597,29 @@
     return 'word';
   }
 
+  // ======== 状态指示器 ========
+  function updateTranslateIndicator(btn) {
+    if (!btn) return;
+    if (translateMode) {
+      btn.classList.add('active');
+      btn.title = '翻译模式：开（在插件配置中修改）';
+    } else {
+      btn.classList.remove('active');
+      btn.title = '翻译模式：关（在插件配置中修改）';
+    }
+  }
+
+  function updatePinIndicator(btn) {
+    if (!btn) return;
+    if (pinMode) {
+      btn.classList.add('active');
+      btn.title = '钉住高亮：开（在插件配置中修改）';
+    } else {
+      btn.classList.remove('active');
+      btn.title = '钉住高亮：关（在插件配置中修改）';
+    }
+  }
+
   // ======== 英文检测 ========
   function isEnglish(text) {
     return /[a-zA-Z]/.test(text);
@@ -636,7 +627,7 @@
 
   // ======== 触发解释 ========
   function triggerExplain(text) {
-    var pos = calcBubblePos();
+    var pos = rememberedPos || calcBubblePos();
     if (translateMode && isEnglish(text)) {
       currentMode = 'translate';
     } else {
@@ -794,9 +785,11 @@
   chrome.storage.onChanged.addListener(function (changes) {
     if (changes.translateMode) {
       translateMode = changes.translateMode.newValue;
+      if (bubble) updateTranslateIndicator(bubble.querySelector('.te-btn-translate'));
     }
     if (changes.pinMode) {
       pinMode = changes.pinMode.newValue;
+      if (bubble) updatePinIndicator(bubble.querySelector('.te-btn-pin'));
     }
   });
 })();
