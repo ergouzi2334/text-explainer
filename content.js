@@ -12,6 +12,9 @@
   let lastRange = null;
   let lastCtrlTime = 0;
   let currentMode = 'word';
+  let translateMode = false;
+  let lastTranslatedRange = null;
+  let persistentHighlights = [];
 
   // 拖拽
   let isDragging = false;
@@ -145,6 +148,7 @@
     collapsedState = {
       conversation: conversation.slice(),
       currentMode: currentMode,
+      translateMode: translateMode,
     };
     var bx = bubble.offsetLeft;
     var by = bubble.offsetTop;
@@ -162,9 +166,11 @@
     bubble = createBubble(fx, fy);
     conversation = saved.conversation;
     currentMode = saved.currentMode;
+    translateMode = saved.translateMode || false;
     // 重建消息列表
     var headerSpan = bubble.querySelector('.te-header span');
-    headerSpan.textContent = currentMode === 'word' ? '解释' : '深度解读';
+    var modeLabels2 = { word: '解释', passage: '深度解读', translate: '翻译', batch: '多词解释' };
+    headerSpan.textContent = modeLabels2[currentMode] || '解释';
     bubbleBody.innerHTML = '';
     for (var i = 1; i < conversation.length; i++) {
       // 跳过第一条 user 消息（原始文本），只显示 AI 回答和后续追问
@@ -178,6 +184,13 @@
     bubble.querySelector('.te-bubble-actions').style.display = 'flex';
     bubbleInput = bubble.querySelector('.te-input');
     bubbleInput.focus();
+
+    // 恢复翻译模式按钮状态
+    var translateBtn2 = bubble.querySelector('.te-btn-translate');
+    if (translateBtn2 && translateMode) {
+      translateBtn2.classList.add('active');
+      translateBtn2.title = '翻译模式：开';
+    }
   }
 
   function createFloatBall(x, y, label) {
@@ -262,6 +275,7 @@
     var headerHtml = '<div class="te-header">';
     headerHtml += '<span>解释中...</span>';
     headerHtml += '<div class="te-header-actions">';
+    headerHtml += '<button class="te-btn-translate" title="翻译模式：点击切换">译</button>';
     headerHtml += '<button class="te-btn-collapse" title="收起为悬浮球">&minus;</button>';
     headerHtml += '<button class="te-btn-close" title="关闭">&times;</button>';
     headerHtml += '</div></div>';
@@ -308,7 +322,28 @@
     div.querySelector('.te-btn-collapse').addEventListener('click', collapseToBall);
 
     // 关闭按钮
-    div.querySelector('.te-btn-close').addEventListener('click', removeBubble);
+    div.querySelector('.te-btn-close').addEventListener('click', function () {
+      lastTranslatedRange = null;
+      removeBubble();
+    });
+
+    // 翻译切换按钮
+    var translateBtn = div.querySelector('.te-btn-translate');
+    if (translateMode) {
+      translateBtn.classList.add('active');
+      translateBtn.title = '翻译模式：开';
+    }
+    translateBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      translateMode = !translateMode;
+      if (translateMode) {
+        translateBtn.classList.add('active');
+        translateBtn.title = '翻译模式：开';
+      } else {
+        translateBtn.classList.remove('active');
+        translateBtn.title = '翻译模式：关';
+      }
+    });
 
     // 追问输入
     bubbleInput = div.querySelector('.te-input');
@@ -353,13 +388,20 @@
     if (!bubble) return;
     conversation.push({ role: 'assistant', content: content });
 
-    bubble.querySelector('.te-header span').textContent = currentMode === 'word' ? '解释' : '深度解读';
+    var modeLabels = { word: '解释', passage: '深度解读', translate: '翻译', batch: '多词解释' };
+    bubble.querySelector('.te-header span').textContent = modeLabels[currentMode] || '解释';
     bubbleBody.innerHTML = '';
     addBubbleMessage('assistant', content);
 
     bubble.querySelector('.te-input-bar').style.display = 'flex';
     bubble.querySelector('.te-bubble-actions').style.display = 'flex';
     bubbleInput.focus();
+
+    // 翻译模式：荧光笔高亮原文
+    if (currentMode === 'translate' && lastTranslatedRange) {
+      highlightPersistent(lastTranslatedRange);
+      lastTranslatedRange = null;
+    }
   }
 
   function addBubbleMessage(role, content) {
@@ -408,15 +450,67 @@
   // ======== 高亮 ========
   function highlightSelection(range) {
     try {
+      // 检查是否已在荧光笔高亮 span 内，避免重复包裹
+      var ancestor = range.commonAncestorContainer;
+      var persistParent = ancestor.nodeType === 1 ? ancestor.closest('.te-hl-persist') : (ancestor.parentElement ? ancestor.parentElement.closest('.te-hl-persist') : null);
+      if (persistParent) {
+        // 已在荧光笔内，直接给荧光笔添加临时高亮类
+        persistParent.classList.add('te-highlight');
+        if (highlights.indexOf(persistParent) === -1) {
+          highlights.push(persistParent);
+        }
+        return;
+      }
       var span = document.createElement('span');
       span.className = 'te-highlight';
-      range.surroundContents(span);
+      safeSurround(range, span);
       highlights.push(span);
     } catch (e) {}
   }
 
+  // 安全的 range 包裹：extractContents → span 收纳 → insertNode，失败时原样恢复
+  function safeSurround(range, wrapper) {
+    // 保存 extractContents 之前的边界引用，用于恢复
+    var startNode = range.startContainer;
+    var startOff = range.startOffset;
+    var endNode = range.endContainer;
+    var endOff = range.endOffset;
+
+    var frag = range.extractContents();
+    wrapper.appendChild(frag); // frag 内容移入 wrapper，frag 变空
+    try {
+      range.insertNode(wrapper);
+    } catch (e) {
+      // insertNode 失败 → 把内容从 wrapper 移回新 fragment，恢复到 range 原位
+      var restoreFrag = document.createDocumentFragment();
+      while (wrapper.firstChild) {
+        restoreFrag.appendChild(wrapper.firstChild);
+      }
+      try {
+        range.insertNode(restoreFrag);
+      } catch (e2) {
+        // range 已失效，用保存的边界引用恢复
+        try {
+          var parent = startNode.nodeType === 3 ? startNode.parentNode : startNode;
+          if (!parent) throw e2;
+          var refChild = startNode.nodeType === 3 ? startNode : startNode.childNodes[startOff] || null;
+          parent.insertBefore(restoreFrag, refChild);
+        } catch (e3) {
+          // 彻底失败：append 到 body（保底，文字至少还在页面上）
+          document.body.appendChild(restoreFrag);
+        }
+      }
+      throw e;
+    }
+  }
+
   function removeAllHighlights() {
     highlights.forEach(function (el) {
+      // 如果是荧光笔 span 被临时添加了 te-highlight 类，只移除类名
+      if (el.classList.contains('te-hl-persist')) {
+        el.classList.remove('te-highlight');
+        return;
+      }
       var parent = el.parentNode;
       if (parent) {
         while (el.firstChild) parent.insertBefore(el.firstChild, el);
@@ -427,12 +521,25 @@
     highlights = [];
   }
 
+  // ======== 荧光笔持久高亮 ========
+  function highlightPersistent(range) {
+    try {
+      var span = document.createElement('span');
+      span.className = 'te-hl-persist';
+      safeSurround(range, span);
+      persistentHighlights.push(span);
+    } catch (e) {
+      // safeSurround 内部已处理错误恢复
+    }
+  }
+
   // ======== 多词模式 ========
   function exitMultiMode() {
     multiMode = false;
     pendingWords = [];
     lastSelection = '';
     lastRange = null;
+    lastTranslatedRange = null;
     removeAllHighlights();
     removeGreenDot();
     removeBadge();
@@ -461,10 +568,33 @@
     return { x: (window.innerWidth - BW) / 2, y: window.innerHeight / 3 };
   }
 
+  // ======== 智能检测：名词 or 句子 ========
+  function detectTextType(text) {
+    // 包含中文标点 → 句子
+    if (/[。！？；：，、（《【]/.test(text)) return 'passage';
+    // 纯中文，8字以内 → 名词/术语
+    if (/^[一-龥a-zA-Z0-9]+$/.test(text) && text.length <= 8) return 'word';
+    // 有空格且超过3个单词 → 句子
+    if (/\s/.test(text) && text.split(/\s+/).length > 3) return 'passage';
+    // 超过20字 → 句子
+    if (text.length > 20) return 'passage';
+    // 其余 → 名词/术语
+    return 'word';
+  }
+
+  // ======== 英文检测 ========
+  function isEnglish(text) {
+    return /[a-zA-Z]/.test(text);
+  }
+
   // ======== 触发解释 ========
   function triggerExplain(text) {
     var pos = calcBubblePos();
-    currentMode = text.length <= 10 ? 'word' : 'passage';
+    if (translateMode && isEnglish(text)) {
+      currentMode = 'translate';
+    } else {
+      currentMode = detectTextType(text);
+    }
     bubble = createBubble(pos.x, pos.y);
     conversation.push({ role: 'user', content: text });
 
@@ -543,6 +673,9 @@
       e.preventDefault();
       e.stopPropagation();
     } else {
+      if (translateMode && isEnglish(text)) {
+        try { lastTranslatedRange = sel.getRangeAt(0).cloneRange(); } catch (e) { lastTranslatedRange = null; }
+      }
       triggerExplain(text);
     }
   });

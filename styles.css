@@ -103,9 +103,22 @@
   line-height: 1;
 }
 
+/* ======== 翻译模式切换按钮 ======== */
+.te-btn-translate {
+  font-size: 12px;
+  font-weight: 590;
+  letter-spacing: 0.02em;
+}
+
+.te-btn-translate.active {
+  background: #007aff !important;
+  color: #fff !important;
+}
+
 @media (prefers-color-scheme: dark) {
   .te-header-actions button { background: rgba(255,255,255,0.12); color: #98989d; }
   .te-header-actions button:hover { background: rgba(255,255,255,0.2); color: #f5f5f7; }
+  .te-btn-translate.active { background: #0a84ff !important; color: #fff !important; }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -433,6 +446,19 @@
   border-radius: 3px;
   padding: 0 2px;
   color: inherit;
+}
+
+/* ======== 翻译荧光笔持久高亮 ======== */
+.te-hl-persist {
+  background: #CCFF00;
+  border-radius: 2px;
+  padding: 0 1px;
+  color: inherit;
+}
+
+/* 多词模式下荧光笔元素叠加临时高亮时，多词高亮优先 */
+.te-hl-persist.te-highlight {
+  background: #fff3bf;
 }
 
 /* ======== 多词计数徽章 ======== */
