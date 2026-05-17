@@ -115,10 +115,23 @@
   color: #fff !important;
 }
 
+/* ======== 钉住高亮按钮 ======== */
+.te-btn-pin {
+  font-size: 12px;
+  font-weight: 590;
+  letter-spacing: 0.02em;
+}
+
+.te-btn-pin.active {
+  background: #FF9500 !important;
+  color: #fff !important;
+}
+
 @media (prefers-color-scheme: dark) {
   .te-header-actions button { background: rgba(255,255,255,0.12); color: #98989d; }
   .te-header-actions button:hover { background: rgba(255,255,255,0.2); color: #f5f5f7; }
   .te-btn-translate.active { background: #0a84ff !important; color: #fff !important; }
+  .te-btn-pin.active { background: #FF9500 !important; color: #fff !important; }
 }
 
 @media (prefers-color-scheme: dark) {

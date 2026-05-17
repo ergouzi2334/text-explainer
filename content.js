@@ -13,6 +13,7 @@
   let lastCtrlTime = 0;
   let currentMode = 'word';
   let translateMode = false;
+  let pinMode = false;
   let lastTranslatedRects = null;
   let persistentOverlays = [];
   let overlayScrollHandler = null;
@@ -150,6 +151,7 @@
       conversation: conversation.slice(),
       currentMode: currentMode,
       translateMode: translateMode,
+      pinMode: pinMode,
     };
     var bx = bubble.offsetLeft;
     var by = bubble.offsetTop;
@@ -168,6 +170,7 @@
     conversation = saved.conversation;
     currentMode = saved.currentMode;
     translateMode = saved.translateMode || false;
+    pinMode = saved.pinMode || false;
     // 重建消息列表
     var headerSpan = bubble.querySelector('.te-header span');
     var modeLabels2 = { word: '解释', passage: '深度解读', translate: '翻译', batch: '多词解释' };
@@ -191,6 +194,12 @@
     if (translateBtn2 && translateMode) {
       translateBtn2.classList.add('active');
       translateBtn2.title = '翻译模式：开';
+    }
+    // 恢复钉住按钮状态
+    var pinBtn2 = bubble.querySelector('.te-btn-pin');
+    if (pinBtn2 && pinMode) {
+      pinBtn2.classList.add('active');
+      pinBtn2.title = '钉住高亮：开';
     }
   }
 
@@ -277,6 +286,7 @@
     headerHtml += '<span>解释中...</span>';
     headerHtml += '<div class="te-header-actions">';
     headerHtml += '<button class="te-btn-translate" title="翻译模式：点击切换">译</button>';
+    headerHtml += '<button class="te-btn-pin" title="钉住高亮：关闭时保留荧光笔">钉</button>';
     headerHtml += '<button class="te-btn-collapse" title="收起为悬浮球">&minus;</button>';
     headerHtml += '<button class="te-btn-close" title="关闭">&times;</button>';
     headerHtml += '</div></div>';
@@ -324,7 +334,7 @@
 
     // 关闭按钮
     div.querySelector('.te-btn-close').addEventListener('click', function () {
-      removePersistentOverlays();
+      if (!pinMode) removePersistentOverlays();
       removeBubble();
     });
 
@@ -343,6 +353,24 @@
       } else {
         translateBtn.classList.remove('active');
         translateBtn.title = '翻译模式：关';
+      }
+    });
+
+    // 钉住按钮
+    var pinBtn = div.querySelector('.te-btn-pin');
+    if (pinMode) {
+      pinBtn.classList.add('active');
+      pinBtn.title = '钉住高亮：开';
+    }
+    pinBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      pinMode = !pinMode;
+      if (pinMode) {
+        pinBtn.classList.add('active');
+        pinBtn.title = '钉住高亮：开';
+      } else {
+        pinBtn.classList.remove('active');
+        pinBtn.title = '钉住高亮：关';
       }
     });
 
@@ -474,6 +502,7 @@
   }
 
   function removeAllHighlights() {
+    if (pinMode) return;  // 钉住模式：保留多词高亮不删除
     for (var i = 0; i < tempOverlays.length; i++) {
       tempOverlays[i].remove();
     }
@@ -486,7 +515,7 @@
   // ======== 荧光笔持久高亮（覆盖层方案：不碰页面DOM，永远不会吞字） ========
   function highlightPersistent(rects) {
     if (!rects || rects.length === 0) return;
-    removePersistentOverlays();
+    if (!pinMode) removePersistentOverlays();
 
     for (var i = 0; i < rects.length; i++) {
       var r = rects[i];
