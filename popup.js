@@ -5,7 +5,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById(tab.dataset.panel).classList.add('active');
-    if (tab.dataset.panel === 'kb-panel') loadKnowledge();
+    if (tab.dataset.panel === 'fav-panel') loadFavorites();
   });
 });
 
@@ -70,89 +70,42 @@ changeBtn.addEventListener('click', () => {
   input.focus();
 });
 
-// ======== 知识库逻辑 ========
-const DB_NAME = 'te-knowledge';
-const DB_VERSION = 1;
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('entries')) {
-        const store = db.createObjectStore('entries', { keyPath: 'id', autoIncrement: true });
-        store.createIndex('createdAt', 'createdAt', { unique: false });
-        store.createIndex('text', 'text', { unique: false });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function loadKnowledge(searchText) {
-  const list = document.getElementById('kbList');
+// ======== 收藏夹逻辑 ========
+async function loadFavorites() {
+  const list = document.getElementById('favList');
   try {
-    const db = await openDB();
-    const tx = db.transaction('entries', 'readonly');
-    const store = tx.objectStore('entries');
-    const entries = await new Promise((resolve) => {
-      const req = store.index('createdAt').openCursor(null, 'prev');
-      const results = [];
-      req.onsuccess = (e) => {
-        const cursor = e.target.result;
-        if (cursor) {
-          const q = (searchText || '').toLowerCase();
-          const item = cursor.value;
-          if (!q || item.text.toLowerCase().includes(q) || item.explanation.toLowerCase().includes(q)) {
-            results.push(item);
-          }
-          cursor.continue();
-        } else {
-          resolve(results);
-        }
-      };
-      req.onerror = () => resolve([]);
-    });
-    db.close();
+    const data = await chrome.storage.local.get('favorites');
+    const entries = data.favorites || [];
 
     if (entries.length === 0) {
-      list.innerHTML = '<div class="kb-empty">还没有收藏的词汇<br>在解释气泡中点击 ⭐ 即可收藏</div>';
+      list.innerHTML = '<div class="fav-empty">还没有收藏的词汇<br>翻译模式下点击 ☆ 即可收藏</div>';
     } else {
-      list.innerHTML = entries.map(e => `
-        <div class="kb-item">
-          <div class="kb-word">${escapeHtml(e.text)}</div>
-          <div class="kb-explain">${escapeHtml(e.explanation)}</div>
-          <div class="kb-meta">
+      list.innerHTML = entries.map((e, i) => `
+        <div class="fav-item">
+          <div class="fav-word">${escapeHtml(e.word)}</div>
+          <div class="fav-translation">${escapeHtml(e.translation)}</div>
+          <div class="fav-meta">
             <span>${formatDate(e.createdAt)}</span>
-            <button class="kb-delete" data-id="${e.id}">删除</button>
+            <button class="fav-delete" data-index="${i}">删除</button>
           </div>
         </div>
       `).join('');
     }
 
-    // 删除按钮事件
-    list.querySelectorAll('.kb-delete').forEach(btn => {
+    list.querySelectorAll('.fav-delete').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = Number(btn.dataset.id);
-        const db2 = await openDB();
-        const tx2 = db2.transaction('entries', 'readwrite');
-        tx2.objectStore('entries').delete(id);
-        tx2.oncomplete = () => { db2.close(); loadKnowledge(getSearchText()); };
+        const idx = Number(btn.dataset.index);
+        const data2 = await chrome.storage.local.get('favorites');
+        const list2 = data2.favorites || [];
+        list2.splice(idx, 1);
+        await chrome.storage.local.set({ favorites: list2 });
+        loadFavorites();
       });
     });
   } catch (e) {
-    list.innerHTML = '<div class="kb-empty">加载失败，请重试</div>';
+    list.innerHTML = '<div class="fav-empty">加载失败，请重试</div>';
   }
 }
-
-function getSearchText() {
-  return document.getElementById('kbSearch').value.trim();
-}
-
-document.getElementById('kbSearch').addEventListener('input', () => {
-  loadKnowledge(getSearchText());
-});
 
 function escapeHtml(text) {
   if (!text) return '';

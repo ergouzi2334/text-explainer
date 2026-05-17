@@ -80,36 +80,14 @@
     return html;
   }
 
-  // ======== 知识库 ========
-  const DB_NAME = 'te-knowledge';
-  const DB_VERSION = 1;
-
-  function openDB() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains('entries')) {
-          const store = db.createObjectStore('entries', { keyPath: 'id', autoIncrement: true });
-          store.createIndex('createdAt', 'createdAt', { unique: false });
-          store.createIndex('text', 'text', { unique: false });
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  async function saveToKnowledge(text, explanation) {
+  // ======== 收藏夹 ========
+  async function saveToFavorites(word, translation) {
     try {
-      const db = await openDB();
-      const tx = db.transaction('entries', 'readwrite');
-      const store = tx.objectStore('entries');
-      store.add({ text, explanation, conversation: [...conversation], createdAt: Date.now() });
-      return new Promise((resolve) => {
-        tx.oncomplete = () => { db.close(); resolve(true); };
-        tx.onerror = () => { db.close(); resolve(false); };
-      });
+      var data = await chrome.storage.local.get('favorites');
+      var list = data.favorites || [];
+      list.unshift({ word: word, translation: translation, createdAt: Date.now() });
+      await chrome.storage.local.set({ favorites: list });
+      return true;
     } catch (e) { return false; }
   }
 
@@ -302,7 +280,7 @@
       '<button class="te-send-btn">↑</button>' +
       '</div>' +
       '<div class="te-bubble-actions" style="display:none">' +
-      '<button class="te-save-btn">☆ 收藏到知识库</button>' +
+      '<button class="te-save-btn">☆ 收藏到收藏夹</button>' +
       '</div>';
 
     document.body.appendChild(div);
@@ -374,15 +352,15 @@
     // 收藏
     div.querySelector('.te-save-btn').addEventListener('click', async function () {
       var originalText = conversation[0] ? conversation[0].content : '';
-      var explanation = conversation[1] ? conversation[1].content : '';
-      var ok = await saveToKnowledge(originalText, explanation);
+      var translation = conversation[1] ? conversation[1].content : '';
+      var ok = await saveToFavorites(originalText, translation);
       var btn = div.querySelector('.te-save-btn');
       if (ok) {
         btn.textContent = '★ 已收藏';
         btn.disabled = true;
       } else {
         btn.textContent = '✕ 收藏失败';
-        setTimeout(function () { btn.textContent = '☆ 收藏到知识库'; }, 1500);
+        setTimeout(function () { btn.textContent = '☆ 收藏到收藏夹'; }, 1500);
       }
     });
 
@@ -399,7 +377,10 @@
     addBubbleMessage('assistant', content);
 
     bubble.querySelector('.te-input-bar').style.display = 'flex';
-    bubble.querySelector('.te-bubble-actions').style.display = 'flex';
+    // 只在翻译模式显示收藏按钮
+    if (currentMode === 'translate') {
+      bubble.querySelector('.te-bubble-actions').style.display = 'flex';
+    }
     bubbleInput.focus();
 
     // 翻译模式：荧光笔高亮原文（覆盖层，不碰页面DOM）
@@ -686,7 +667,6 @@
         var lines = res.content.split('\n').filter(function (l) { return l.trim(); });
         bubbleBody.innerHTML = lines.map(function (l) { return '<p>' + l + '</p>'; }).join('');
         bubble.querySelector('.te-input-bar').style.display = 'flex';
-        bubble.querySelector('.te-bubble-actions').style.display = 'flex';
       } else {
         showError(res.error);
       }
