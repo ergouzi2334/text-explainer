@@ -5,7 +5,7 @@
   let conversation = [];
   let multiMode = false;
   let pendingWords = [];
-  let highlights = [];
+  let tempOverlays = [];
   let greenDot = null;
   let countBadge = null;
   let lastSelection = '';
@@ -13,8 +13,9 @@
   let lastCtrlTime = 0;
   let currentMode = 'word';
   let translateMode = false;
-  let lastTranslatedRange = null;
-  let persistentHighlights = [];
+  let lastTranslatedRects = null;
+  let persistentOverlays = [];
+  let overlayScrollHandler = null;
 
   // 拖拽
   let isDragging = false;
@@ -323,7 +324,7 @@
 
     // 关闭按钮
     div.querySelector('.te-btn-close').addEventListener('click', function () {
-      lastTranslatedRange = null;
+      removePersistentOverlays();
       removeBubble();
     });
 
@@ -397,10 +398,10 @@
     bubble.querySelector('.te-bubble-actions').style.display = 'flex';
     bubbleInput.focus();
 
-    // 翻译模式：荧光笔高亮原文
-    if (currentMode === 'translate' && lastTranslatedRange) {
-      highlightPersistent(lastTranslatedRange);
-      lastTranslatedRange = null;
+    // 翻译模式：荧光笔高亮原文（覆盖层，不碰页面DOM）
+    if (currentMode === 'translate' && lastTranslatedRects) {
+      highlightPersistent(lastTranslatedRects);
+      lastTranslatedRects = null;
     }
   }
 
@@ -447,89 +448,98 @@
     bubbleBody.innerHTML = '<div class="te-error-msg"><p>' + msg + '</p></div>';
   }
 
-  // ======== 高亮 ========
+  // ======== 多词高亮（覆盖层方案：不碰页面DOM） ========
   function highlightSelection(range) {
     try {
-      // 检查是否已在荧光笔高亮 span 内，避免重复包裹
-      var ancestor = range.commonAncestorContainer;
-      var persistParent = ancestor.nodeType === 1 ? ancestor.closest('.te-hl-persist') : (ancestor.parentElement ? ancestor.parentElement.closest('.te-hl-persist') : null);
-      if (persistParent) {
-        // 已在荧光笔内，直接给荧光笔添加临时高亮类
-        persistParent.classList.add('te-highlight');
-        if (highlights.indexOf(persistParent) === -1) {
-          highlights.push(persistParent);
-        }
-        return;
+      var rects = range.getClientRects();
+      if (!rects || rects.length === 0) return;
+      for (var i = 0; i < rects.length; i++) {
+        var r = rects[i];
+        if (r.width <= 0 || r.height <= 0) continue;
+        var overlay = document.createElement('div');
+        overlay.className = 'te-hl-temp';
+        overlay.style.left = r.left + 'px';
+        overlay.style.top = r.top + 'px';
+        overlay.style.width = r.width + 'px';
+        overlay.style.height = r.height + 'px';
+        overlay._origLeft = r.left;
+        overlay._origTop = r.top;
+        overlay._origScrollX = window.scrollX;
+        overlay._origScrollY = window.scrollY;
+        document.body.appendChild(overlay);
+        tempOverlays.push(overlay);
       }
-      var span = document.createElement('span');
-      span.className = 'te-highlight';
-      safeSurround(range, span);
-      highlights.push(span);
+      ensureOverlayScrollHandler();
     } catch (e) {}
   }
 
-  // 安全的 range 包裹：extractContents → span 收纳 → insertNode，失败时原样恢复
-  function safeSurround(range, wrapper) {
-    // 保存 extractContents 之前的边界引用，用于恢复
-    var startNode = range.startContainer;
-    var startOff = range.startOffset;
-    var endNode = range.endContainer;
-    var endOff = range.endOffset;
-
-    var frag = range.extractContents();
-    wrapper.appendChild(frag); // frag 内容移入 wrapper，frag 变空
-    try {
-      range.insertNode(wrapper);
-    } catch (e) {
-      // insertNode 失败 → 把内容从 wrapper 移回新 fragment，恢复到 range 原位
-      var restoreFrag = document.createDocumentFragment();
-      while (wrapper.firstChild) {
-        restoreFrag.appendChild(wrapper.firstChild);
-      }
-      try {
-        range.insertNode(restoreFrag);
-      } catch (e2) {
-        // range 已失效，用保存的边界引用恢复
-        try {
-          var parent = startNode.nodeType === 3 ? startNode.parentNode : startNode;
-          if (!parent) throw e2;
-          var refChild = startNode.nodeType === 3 ? startNode : startNode.childNodes[startOff] || null;
-          parent.insertBefore(restoreFrag, refChild);
-        } catch (e3) {
-          // 彻底失败：append 到 body（保底，文字至少还在页面上）
-          document.body.appendChild(restoreFrag);
-        }
-      }
-      throw e;
+  function removeAllHighlights() {
+    for (var i = 0; i < tempOverlays.length; i++) {
+      tempOverlays[i].remove();
+    }
+    tempOverlays = [];
+    if (persistentOverlays.length === 0) {
+      removeOverlayScrollHandler();
     }
   }
 
-  function removeAllHighlights() {
-    highlights.forEach(function (el) {
-      // 如果是荧光笔 span 被临时添加了 te-highlight 类，只移除类名
-      if (el.classList.contains('te-hl-persist')) {
-        el.classList.remove('te-highlight');
-        return;
-      }
-      var parent = el.parentNode;
-      if (parent) {
-        while (el.firstChild) parent.insertBefore(el.firstChild, el);
-        parent.removeChild(el);
-        parent.normalize();
-      }
-    });
-    highlights = [];
+  // ======== 荧光笔持久高亮（覆盖层方案：不碰页面DOM，永远不会吞字） ========
+  function highlightPersistent(rects) {
+    if (!rects || rects.length === 0) return;
+    removePersistentOverlays();
+
+    for (var i = 0; i < rects.length; i++) {
+      var r = rects[i];
+      if (r.width <= 0 || r.height <= 0) continue;
+      var overlay = document.createElement('div');
+      overlay.className = 'te-hl-overlay';
+      overlay.style.left = r.left + 'px';
+      overlay.style.top = r.top + 'px';
+      overlay.style.width = r.width + 'px';
+      overlay.style.height = r.height + 'px';
+      overlay._origLeft = r.left;
+      overlay._origTop = r.top;
+      overlay._origScrollX = window.scrollX;
+      overlay._origScrollY = window.scrollY;
+      document.body.appendChild(overlay);
+      persistentOverlays.push(overlay);
+    }
+
+    ensureOverlayScrollHandler();
   }
 
-  // ======== 荧光笔持久高亮 ========
-  function highlightPersistent(range) {
-    try {
-      var span = document.createElement('span');
-      span.className = 'te-hl-persist';
-      safeSurround(range, span);
-      persistentHighlights.push(span);
-    } catch (e) {
-      // safeSurround 内部已处理错误恢复
+  function removePersistentOverlays() {
+    for (var i = 0; i < persistentOverlays.length; i++) {
+      persistentOverlays[i].remove();
+    }
+    persistentOverlays = [];
+    if (tempOverlays.length === 0) {
+      removeOverlayScrollHandler();
+    }
+  }
+
+  // ======== 统一滚动同步（所有覆盖层各自记住捕获时的滚动位置） ========
+  function ensureOverlayScrollHandler() {
+    if (overlayScrollHandler) return;
+    overlayScrollHandler = function () {
+      var sx = window.scrollX;
+      var sy = window.scrollY;
+      var all = tempOverlays.concat(persistentOverlays);
+      for (var i = 0; i < all.length; i++) {
+        var ol = all[i];
+        var dy = ol._origScrollY - sy;
+        var dx = ol._origScrollX - sx;
+        ol.style.top = (ol._origTop + dy) + 'px';
+        ol.style.left = (ol._origLeft + dx) + 'px';
+      }
+    };
+    window.addEventListener('scroll', overlayScrollHandler, { passive: true });
+  }
+
+  function removeOverlayScrollHandler() {
+    if (overlayScrollHandler) {
+      window.removeEventListener('scroll', overlayScrollHandler);
+      overlayScrollHandler = null;
     }
   }
 
@@ -539,7 +549,7 @@
     pendingWords = [];
     lastSelection = '';
     lastRange = null;
-    lastTranslatedRange = null;
+    lastTranslatedRects = null;
     removeAllHighlights();
     removeGreenDot();
     removeBadge();
@@ -633,7 +643,7 @@
     pendingWords = [];
     removeBadge();
 
-    currentMode = 'word';
+    currentMode = 'batch';
     var x = (window.innerWidth - 360) / 2;
     var y = 60;
     bubble = createBubble(x, y);
@@ -674,7 +684,9 @@
       e.stopPropagation();
     } else {
       if (translateMode && isEnglish(text)) {
-        try { lastTranslatedRange = sel.getRangeAt(0).cloneRange(); } catch (e) { lastTranslatedRange = null; }
+        try {
+          lastTranslatedRects = sel.getRangeAt(0).getClientRects();
+        } catch (e) { lastTranslatedRects = null; }
       }
       triggerExplain(text);
     }

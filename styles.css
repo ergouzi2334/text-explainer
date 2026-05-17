@@ -440,25 +440,26 @@
   to   { opacity: 1; transform: scale(1);   }
 }
 
-/* ======== 多词高亮 ======== */
-.te-highlight {
+/* ======== 多词高亮（覆盖层，不碰页面DOM） ======== */
+.te-hl-temp {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
   background: #fff3bf;
+  mix-blend-mode: multiply;
+  opacity: 0.6;
   border-radius: 3px;
-  padding: 0 2px;
-  color: inherit;
 }
 
-/* ======== 翻译荧光笔持久高亮 ======== */
-.te-hl-persist {
+/* ======== 翻译荧光笔持久高亮（覆盖层，不碰页面DOM） ======== */
+.te-hl-overlay {
+  position: fixed;
+  z-index: 2147483645;
+  pointer-events: none;
   background: #CCFF00;
+  mix-blend-mode: multiply;
+  opacity: 0.45;
   border-radius: 2px;
-  padding: 0 1px;
-  color: inherit;
-}
-
-/* 多词模式下荧光笔元素叠加临时高亮时，多词高亮优先 */
-.te-hl-persist.te-highlight {
-  background: #fff3bf;
 }
 
 /* ======== 多词计数徽章 ======== */
