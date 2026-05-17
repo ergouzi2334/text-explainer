@@ -17,8 +17,14 @@ const input = document.getElementById('apiKey');
 const saveBtn = document.getElementById('saveBtn');
 const changeBtn = document.getElementById('changeBtn');
 const msg = document.getElementById('msg');
+const translateToggle = document.getElementById('translateToggle');
+const pinToggle = document.getElementById('pinToggle');
 
-chrome.storage.sync.get('apiKey', ({ apiKey }) => {
+chrome.storage.sync.get(['apiKey', 'translateMode', 'pinMode'], ({ apiKey, translateMode, pinMode }) => {
+  // 开关初始状态
+  translateToggle.checked = translateMode || false;
+  pinToggle.checked = pinMode || false;
+
   if (apiKey) {
     statusEl.textContent = '已配置 · 就绪';
     statusEl.className = 'status';
@@ -31,6 +37,15 @@ chrome.storage.sync.get('apiKey', ({ apiKey }) => {
     configuredEl.style.display = 'none';
     setupEl.style.display = 'block';
   }
+});
+
+// 开关变化时保存
+translateToggle.addEventListener('change', () => {
+  chrome.storage.sync.set({ translateMode: translateToggle.checked });
+});
+
+pinToggle.addEventListener('change', () => {
+  chrome.storage.sync.set({ pinMode: pinToggle.checked });
 });
 
 saveBtn.addEventListener('click', () => {

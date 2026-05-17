@@ -254,6 +254,78 @@
       letter-spacing: -0.01em;
       line-height: 1.6;
     }
+
+    /* ======== 开关行 ======== */
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+    }
+
+    .toggle-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .toggle-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1d1d1f;
+      letter-spacing: -0.022em;
+    }
+
+    .toggle-hint {
+      font-size: 11px;
+      color: #aeaeb2;
+      letter-spacing: -0.01em;
+    }
+
+    /* ======== iOS 风格开关 ======== */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 30px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #e5e5ea;
+      border-radius: 15px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      height: 26px;
+      width: 26px;
+      left: 2px;
+      bottom: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15), 0 0 0 0.5px rgba(0,0,0,0.04);
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background: #34c759;
+    }
+
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
   </style>
 </head>
 <body>
@@ -271,6 +343,27 @@
       <div id="configured" style="display:none">
         <div class="config-info">
           选中文字自动解释 &middot; 双击 Ctrl 开启多词模式
+        </div>
+        <div class="divider"></div>
+        <div class="toggle-row">
+          <div class="toggle-text">
+            <span class="toggle-label">翻译模式</span>
+            <span class="toggle-hint">选中英文时自动翻译</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="translateToggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-text">
+            <span class="toggle-label">钉住高亮</span>
+            <span class="toggle-hint">关闭气泡后荧光笔保留</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="pinToggle">
+            <span class="toggle-slider"></span>
+          </label>
         </div>
         <div class="divider"></div>
         <button class="btn ghost" id="changeBtn">更换 API Key</button>

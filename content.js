@@ -18,6 +18,12 @@
   let persistentOverlays = [];
   let overlayScrollHandler = null;
 
+  // 从存储加载设置
+  chrome.storage.sync.get(['translateMode', 'pinMode'], function (res) {
+    translateMode = res.translateMode || false;
+    pinMode = res.pinMode || false;
+  });
+
   // 拖拽
   let isDragging = false;
   let dragStartX = 0, dragStartY = 0;
@@ -347,6 +353,7 @@
     translateBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       translateMode = !translateMode;
+      chrome.storage.sync.set({ translateMode: translateMode });
       if (translateMode) {
         translateBtn.classList.add('active');
         translateBtn.title = '翻译模式：开';
@@ -365,6 +372,7 @@
     pinBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       pinMode = !pinMode;
+      chrome.storage.sync.set({ pinMode: pinMode });
       if (pinMode) {
         pinBtn.classList.add('active');
         pinBtn.title = '钉住高亮：开';
@@ -779,6 +787,16 @@
     if (floatBall && floatBall.contains(e.target)) return;
     if (bubble && !bubble.contains(e.target)) {
       // 不关闭气泡，由用户点关闭按钮或收起控制
+    }
+  });
+
+  // ======== 同步插件配置界面的开关变化 ========
+  chrome.storage.onChanged.addListener(function (changes) {
+    if (changes.translateMode) {
+      translateMode = changes.translateMode.newValue;
+    }
+    if (changes.pinMode) {
+      pinMode = changes.pinMode.newValue;
     }
   });
 })();
